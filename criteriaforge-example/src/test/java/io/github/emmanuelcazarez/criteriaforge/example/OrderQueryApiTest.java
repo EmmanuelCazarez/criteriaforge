@@ -4,27 +4,35 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.context.WebApplicationContext;
 
 @SpringBootTest
-@AutoConfigureMockMvc
 class OrderQueryApiTest {
 
     @Autowired
+    private WebApplicationContext applicationContext;
+
     private MockMvc mockMvc;
+
+    @BeforeEach
+    void setUpMockMvc() {
+        mockMvc = MockMvcBuilders.webAppContextSetup(applicationContext).build();
+    }
 
     @Test
     void exposesDynamicFiltersNestedProjectionsSortAndPagination() throws Exception {
         mockMvc.perform(get("/api/orders")
-                .param("status_eq", "PAID")
-                .param("total_gte", "100")
-                .param("fields", "id,customer.name,total")
-                .param("sort", "-total")
-                .param("limit", "20"))
+                .queryParam("status_eq", "PAID")
+                .queryParam("total_gte", "100")
+                .queryParam("fields", "id,customer.name,total")
+                .queryParam("sort", "-total")
+                .queryParam("limit", "20"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.total").value(2))
             .andExpect(jsonPath("$.offset").value(0))
@@ -36,7 +44,7 @@ class OrderQueryApiTest {
 
     @Test
     void rejectsHiddenFieldsWithAStableHttpError() throws Exception {
-        mockMvc.perform(get("/api/orders").param("internalNote_eq", "private"))
+        mockMvc.perform(get("/api/orders").queryParam("internalNote_eq", "private"))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("FIELD_NOT_ALLOWED"))
             .andExpect(jsonPath("$.path").value("internalNote"));
@@ -45,10 +53,10 @@ class OrderQueryApiTest {
     @Test
     void enablesRelationshipQueriesThroughAnExplicitExamplePolicy() throws Exception {
         mockMvc.perform(get("/api/orders")
-                .param("customer.country_eq", "MX")
-                .param("fields", "reference,customer.name")
-                .param("sort", "reference")
-                .param("limit", "20"))
+                .queryParam("customer.country_eq", "MX")
+                .queryParam("fields", "reference,customer.name")
+                .queryParam("sort", "reference")
+                .queryParam("limit", "20"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.total").value(2))
             .andExpect(jsonPath("$.content[0].reference").value("ORD-100"))

@@ -2,6 +2,7 @@ package io.github.emmanuelcazarez.criteriaforge.jpa.model;
 
 import io.github.emmanuelcazarez.criteriaforge.core.annotation.QueryHidden;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Column;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
@@ -9,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,7 +25,10 @@ public class OrderEntity {
     @Enumerated(EnumType.STRING)
     private OrderStatus status;
 
+    @Column(precision = 20, scale = 4)
     private BigDecimal total;
+
+    private OffsetDateTime createdAt;
 
     @QueryHidden
     private String secretNote;
@@ -59,6 +64,14 @@ public class OrderEntity {
 
     public BigDecimal getTotal() {
         return total;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(OffsetDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 
     public CustomerEntity getCustomer() {

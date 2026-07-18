@@ -21,13 +21,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.transaction.annotation.Transactional;
 
-@DataJpaTest(
-    showSql = false,
-    properties = {"spring.main.banner-mode=off", "logging.level.root=ERROR"})
-@ContextConfiguration(classes = JpaTestApplication.class)
+@SpringJUnitConfig(JpaTestApplication.class)
+@Transactional
 class JpaPredicateBuilderTest {
 
     @Autowired

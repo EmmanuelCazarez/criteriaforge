@@ -30,10 +30,10 @@ class CriteriaQueryArgumentResolverTest {
     @Test
     void bindsAnnotatedQuerySpecParameters() throws Exception {
         mockMvc.perform(get("/orders")
-                .param("status_eq", "PAID")
-                .param("fields", "reference,total")
-                .param("sort", "-total")
-                .param("limit", "20"))
+                .queryParam("status_eq", "PAID")
+                .queryParam("fields", "reference,total")
+                .queryParam("sort", "-total")
+                .queryParam("limit", "20"))
             .andExpect(status().isOk())
             .andExpect(content().string("[reference, total]|[SortSpec[field=total, direction=DESC]]|20"));
     }
@@ -41,7 +41,7 @@ class CriteriaQueryArgumentResolverTest {
     @Test
     void propagatesStableParserFailures() {
         assertThatThrownBy(() -> mockMvc.perform(get("/orders")
-                .param("total_approx", "10")))
+                .queryParam("total_approx", "10")))
             .hasRootCauseInstanceOf(QueryValidationException.class);
     }
 
