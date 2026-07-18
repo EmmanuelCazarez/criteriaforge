@@ -19,6 +19,7 @@ class DocumentationContractTest {
         "docs/branching.md",
         "CONTRIBUTING.md",
         "CHANGELOG.md",
+        "RELEASING.md",
         "SECURITY.md");
 
     private static final Pattern MARKDOWN_LINK =

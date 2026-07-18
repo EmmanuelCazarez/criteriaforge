@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without the v prefix
+        required: true
+        type: string
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: maven-central
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          server-id: central
+          server-username: CENTRAL_USERNAME
+          server-password: CENTRAL_PASSWORD
+
+      - name: Verify release tag and main ancestry
+        id: candidate
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
+            tag="${RELEASE_TAG}"
+            version="${tag#v}"
+          else
+            version="${DISPATCH_VERSION}"
+            tag="v${version}"
+          fi
+          [[ "${tag}" == "v${version}" ]]
+          git fetch --force origin main --tags
+          git checkout --detach "refs/tags/${tag}"
+          project_version="$(./mvnw -q -DforceStdout help:evaluate -Dexpression=project.version)"
+          [[ "${project_version}" == "${version}" ]]
+          [[ "${project_version}" != *-SNAPSHOT ]]
+          git merge-base --is-ancestor HEAD origin/main
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify release candidate
+        run: ./mvnw -B -ntp clean verify -Dspring-boot.version=3.5.16
+
+      - name: Import signing key into an ephemeral keyring
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+        run: |
+          signing_home="$(mktemp -d)"
+          chmod 700 "${signing_home}"
+          echo "GNUPGHOME=${signing_home}" >> "${GITHUB_ENV}"
+          printf '%s' "${GPG_PRIVATE_KEY}" | base64 --decode | gpg --batch --import
+
+      - name: Upload signed bundle for manual publication
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: >-
+          ./mvnw -B -ntp -Prelease -DskipTests
+          -Dgpg.passphrase="${GPG_PASSPHRASE}" deploy
+
+      - name: Remove ephemeral signing material
+        if: always()
+        run: |
+          if [[ -n "${GNUPGHOME:-}" && "${GNUPGHOME}" == /tmp/* ]]; then
+            gpgconf --kill all || true
+            rm -rf "${GNUPGHOME}"
+          fi

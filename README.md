@@ -109,6 +109,7 @@ CI verifies Java 17 against Spring Boot 3.5.16 and 4.1.0, plus H2 and PostgreSQL
 - [Architecture](docs/architecture.md)
 - [Branch and release flow](docs/branching.md)
 - [Contributing](CONTRIBUTING.md)
+- [Release guide](RELEASING.md)
 - [Security reporting](SECURITY.md)
 - [Changelog](CHANGELOG.md)
 
