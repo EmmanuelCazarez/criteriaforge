@@ -9,16 +9,13 @@ import io.github.emmanuelcazarez.criteriaforge.jpa.model.OrderEntity;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.SpringBootConfiguration;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.test.context.ContextConfiguration;
 
 @DataJpaTest(
     showSql = false,
     properties = {"spring.main.banner-mode=off", "logging.level.root=ERROR"})
-@ContextConfiguration(classes = JpaPathResolverTest.TestApplication.class)
+@ContextConfiguration(classes = JpaTestApplication.class)
 class JpaPathResolverTest {
 
     @Autowired
@@ -68,11 +65,5 @@ class JpaPathResolverTest {
                 assertThat(error.code()).isEqualTo(QueryErrorCode.UNKNOWN_FIELD);
                 assertThat(error.path()).contains("customer.missing");
             });
-    }
-
-    @SpringBootConfiguration
-    @EnableAutoConfiguration
-    @EntityScan(basePackageClasses = OrderEntity.class)
-    static class TestApplication {
     }
 }
