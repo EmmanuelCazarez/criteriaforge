@@ -185,6 +185,9 @@
             </properties>
         </profile>
         <profile>
+            <id>documentation</id>
+        </profile>
+        <profile>
             <id>quality</id>
             <build>
                 <plugins>
