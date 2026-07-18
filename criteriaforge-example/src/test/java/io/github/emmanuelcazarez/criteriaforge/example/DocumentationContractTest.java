@@ -62,11 +62,13 @@ class DocumentationContractTest {
             .contains("0.1.0");
 
         for (var document : REQUIRED_DOCUMENTS) {
+            var formerOrganization = "cop" + "pel";
+            var privateKeyHeader = "-----BE" + "GIN " + "PRIVATE " + "KEY-----";
             assertThat(Files.readString(root.resolve(document)))
                 .as("publishable content in %s", document)
-                .doesNotContainIgnoringCase("coppel")
-                .doesNotContain("com.coppel")
-                .doesNotContain("-----BEGIN PRIVATE KEY-----")
+                .doesNotContainIgnoringCase(formerOrganization)
+                .doesNotContain("com." + formerOrganization)
+                .doesNotContain(privateKeyHeader)
                 .doesNotContain("/Users/");
         }
     }
