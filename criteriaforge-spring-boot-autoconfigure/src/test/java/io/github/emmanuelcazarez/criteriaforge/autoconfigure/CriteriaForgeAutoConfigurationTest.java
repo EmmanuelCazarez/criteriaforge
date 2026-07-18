@@ -9,6 +9,7 @@ import io.github.emmanuelcazarez.criteriaforge.jpa.QueryPolicyResolver;
 import io.github.emmanuelcazarez.criteriaforge.web.CriteriaForgeWebMvcConfigurer;
 import io.github.emmanuelcazarez.criteriaforge.web.QueryParameterParser;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.metamodel.Metamodel;
 import java.lang.reflect.Proxy;
 import java.util.List;
@@ -89,6 +90,11 @@ class CriteriaForgeAutoConfigurationTest {
                 (instance, method, arguments) -> method.getName().equals("getMetamodel")
                     ? metamodel
                     : defaultValue(method.getReturnType()));
+        }
+
+        @Bean
+        EntityManagerFactory entityManagerFactory() {
+            return proxy(EntityManagerFactory.class);
         }
     }
 
