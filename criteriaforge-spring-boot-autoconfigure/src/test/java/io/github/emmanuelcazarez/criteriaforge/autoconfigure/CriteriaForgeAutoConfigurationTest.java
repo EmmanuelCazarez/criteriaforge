@@ -6,6 +6,8 @@ import io.github.emmanuelcazarez.criteriaforge.core.QueryResult;
 import io.github.emmanuelcazarez.criteriaforge.core.QuerySpec;
 import io.github.emmanuelcazarez.criteriaforge.jpa.CriteriaForgeExecutor;
 import io.github.emmanuelcazarez.criteriaforge.jpa.QueryPolicyResolver;
+import io.github.emmanuelcazarez.criteriaforge.web.CriteriaForgeWebMvcConfigurer;
+import io.github.emmanuelcazarez.criteriaforge.web.QueryParameterParser;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.metamodel.Metamodel;
 import java.lang.reflect.Proxy;
@@ -20,7 +22,9 @@ import org.springframework.context.annotation.Configuration;
 class CriteriaForgeAutoConfigurationTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-        .withConfiguration(AutoConfigurations.of(CriteriaForgeAutoConfiguration.class));
+        .withConfiguration(AutoConfigurations.of(
+            CriteriaForgeAutoConfiguration.class,
+            CriteriaForgeWebAutoConfiguration.class));
 
     @Test
     void configuresTheExecutorAndDefaultPolicyWhenJpaIsAvailable() {
@@ -64,6 +68,14 @@ class CriteriaForgeAutoConfigurationTest {
 
         contextRunner.run(context -> assertThat(context)
             .doesNotHaveBean(CriteriaForgeExecutor.class));
+    }
+
+    @Test
+    void configuresTheOptionalWebAdapterWhenItsModuleIsPresent() {
+        contextRunner.run(context -> {
+            assertThat(context).hasSingleBean(QueryParameterParser.class);
+            assertThat(context).hasSingleBean(CriteriaForgeWebMvcConfigurer.class);
+        });
     }
 
     @Configuration(proxyBeanMethods = false)
