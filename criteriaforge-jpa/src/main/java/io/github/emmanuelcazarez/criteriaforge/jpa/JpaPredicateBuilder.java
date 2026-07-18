@@ -38,7 +38,17 @@ public final class JpaPredicateBuilder {
         Objects.requireNonNull(root, "root must not be null");
         Objects.requireNonNull(criteriaBuilder, "criteriaBuilder must not be null");
         Objects.requireNonNull(policy, "policy must not be null");
-        return buildNode(expression, root, criteriaBuilder, policy, new JoinRegistry(root));
+        return build(expression, root, criteriaBuilder, policy, new JoinRegistry(root));
+    }
+
+    Predicate build(
+            FilterExpression expression,
+            Root<?> root,
+            CriteriaBuilder criteriaBuilder,
+            QueryPolicy policy,
+            JoinRegistry joins) {
+        Objects.requireNonNull(joins, "joins must not be null");
+        return buildNode(expression, root, criteriaBuilder, policy, joins);
     }
 
     private Predicate buildNode(

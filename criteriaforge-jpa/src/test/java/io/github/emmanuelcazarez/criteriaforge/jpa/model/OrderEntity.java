@@ -64,4 +64,8 @@ public class OrderEntity {
     public List<OrderItemEntity> getItems() {
         return items;
     }
+
+    public void addItem(OrderItemEntity item) {
+        items.add(item);
+    }
 }
