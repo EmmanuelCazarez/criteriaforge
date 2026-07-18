@@ -8,11 +8,14 @@ import io.github.emmanuelcazarez.criteriaforge.core.QueryResult;
 import io.github.emmanuelcazarez.criteriaforge.core.QuerySpec;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Tuple;
 import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.metamodel.PluralAttribute;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.IntStream;
 
 /** Default Criteria API implementation of {@link CriteriaForgeExecutor}. */
 public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor {
@@ -21,6 +24,8 @@ public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor
     private final QueryComplexityValidator complexityValidator = new QueryComplexityValidator();
     private final JpaPredicateBuilder predicateBuilder;
     private final JpaSortBuilder sortBuilder;
+    private final JpaSelectionBuilder selectionBuilder;
+    private final NestedMapAssembler mapAssembler = new NestedMapAssembler();
 
     public DefaultCriteriaForgeExecutor(
             EntityManager entityManager, QueryPolicyResolver policyResolver) {
@@ -30,6 +35,7 @@ public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor
         var pathResolver = new JpaPathResolver(entityManager.getMetamodel());
         predicateBuilder = new JpaPredicateBuilder(pathResolver, new JpaValueConverter());
         sortBuilder = new JpaSortBuilder(pathResolver);
+        selectionBuilder = new JpaSelectionBuilder(pathResolver, entityManager.getMetamodel());
     }
 
     @Override
@@ -69,6 +75,54 @@ public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor
             .getResultList();
         var total = count(entityType, query, policy);
         return new QueryResult<>(content, total, page.offset(), page.limit());
+    }
+
+    @Override
+    public QueryResult<Map<String, Object>> findProjected(
+            Class<?> entityType, QuerySpec query) {
+        Objects.requireNonNull(entityType, "entityType must not be null");
+        Objects.requireNonNull(query, "query must not be null");
+        if (query.fields().isEmpty()) {
+            throw new QueryValidationException(
+                QueryErrorCode.MALFORMED_QUERY,
+                "At least one projection field is required");
+        }
+
+        var policy = Objects.requireNonNull(
+            policyResolver.resolve(entityType), "resolved query policy must not be null");
+        complexityValidator.validate(query, policy);
+        var page = query.page().orElse(PageSpec.offset(0, policy.maxPageSize()));
+
+        var criteriaBuilder = entityManager.getCriteriaBuilder();
+        var contentQuery = criteriaBuilder.createTupleQuery();
+        var contentRoot = contentQuery.from(entityType);
+        var contentJoins = new JoinRegistry(contentRoot);
+        contentQuery.multiselect(selectionBuilder.build(
+            query.fields(), contentRoot, policy, contentJoins));
+        query.filter().ifPresent(expression -> contentQuery.where(predicateBuilder.build(
+            expression, contentRoot, criteriaBuilder, policy, contentJoins)));
+        if (query.sorts().isEmpty()) {
+            contentQuery.orderBy(criteriaBuilder.asc(contentRoot.get(identifierName(entityType))));
+        } else {
+            contentQuery.orderBy(sortBuilder.build(
+                query.sorts(), contentRoot, criteriaBuilder, policy, contentJoins));
+        }
+        contentQuery.distinct(hasPluralJoin(contentRoot));
+
+        var content = entityManager.createQuery(contentQuery)
+            .setFirstResult(page.offset())
+            .setMaxResults(page.limit())
+            .getResultList().stream()
+            .map(tuple -> mapAssembler.assemble(query.fields(), tupleValues(tuple)))
+            .toList();
+        var total = count(entityType, query, policy);
+        return new QueryResult<>(content, total, page.offset(), page.limit());
+    }
+
+    private static java.util.List<?> tupleValues(Tuple tuple) {
+        return IntStream.range(0, tuple.getElements().size())
+            .mapToObj(tuple::get)
+            .toList();
     }
 
     private <T> long count(Class<T> entityType, QuerySpec query, QueryPolicy policy) {
