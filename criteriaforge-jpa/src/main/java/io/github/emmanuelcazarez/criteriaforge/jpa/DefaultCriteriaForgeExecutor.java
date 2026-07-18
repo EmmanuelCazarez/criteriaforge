@@ -25,6 +25,7 @@ public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor
     private final JpaPredicateBuilder predicateBuilder;
     private final JpaSortBuilder sortBuilder;
     private final JpaSelectionBuilder selectionBuilder;
+    private final JpaQueryPolicyValidator policyValidator;
     private final NestedMapAssembler mapAssembler = new NestedMapAssembler();
 
     public DefaultCriteriaForgeExecutor(
@@ -36,6 +37,7 @@ public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor
         predicateBuilder = new JpaPredicateBuilder(pathResolver, new JpaValueConverter());
         sortBuilder = new JpaSortBuilder(pathResolver);
         selectionBuilder = new JpaSelectionBuilder(pathResolver, entityManager.getMetamodel());
+        policyValidator = new JpaQueryPolicyValidator(entityManager.getMetamodel());
     }
 
     @Override
@@ -51,6 +53,7 @@ public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor
         var policy = Objects.requireNonNull(
             policyResolver.resolve(entityType), "resolved query policy must not be null");
         complexityValidator.validate(query, policy);
+        policyValidator.validate(entityType, query, policy);
         var page = query.page().orElse(PageSpec.offset(0, policy.maxPageSize()));
 
         var criteriaBuilder = entityManager.getCriteriaBuilder();
@@ -91,6 +94,7 @@ public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor
         var policy = Objects.requireNonNull(
             policyResolver.resolve(entityType), "resolved query policy must not be null");
         complexityValidator.validate(query, policy);
+        policyValidator.validate(entityType, query, policy);
         var page = query.page().orElse(PageSpec.offset(0, policy.maxPageSize()));
 
         var criteriaBuilder = entityManager.getCriteriaBuilder();

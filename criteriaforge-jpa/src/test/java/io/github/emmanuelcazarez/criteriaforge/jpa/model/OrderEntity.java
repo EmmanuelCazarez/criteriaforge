@@ -1,5 +1,6 @@
 package io.github.emmanuelcazarez.criteriaforge.jpa.model;
 
+import io.github.emmanuelcazarez.criteriaforge.core.annotation.QueryHidden;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -23,6 +24,9 @@ public class OrderEntity {
     private OrderStatus status;
 
     private BigDecimal total;
+
+    @QueryHidden
+    private String secretNote;
 
     @ManyToOne
     private CustomerEntity customer;
