@@ -234,7 +234,7 @@
                                 </goals>
                                 <configuration>
                                     <skip>${gpg.skip}</skip>
-                                    <pinentryMode>loopback</pinentryMode>
+                                    <bestPractices>true</bestPractices>
                                 </configuration>
                             </execution>
                         </executions>

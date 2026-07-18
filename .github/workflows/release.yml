@@ -73,10 +73,10 @@ jobs:
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: >-
           ./mvnw -B -ntp -Prelease -DskipTests
-          -Dgpg.passphrase="${GPG_PASSPHRASE}" deploy
+          deploy
 
       - name: Remove ephemeral signing material
         if: always()
