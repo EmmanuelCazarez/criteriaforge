@@ -2,7 +2,7 @@ package io.github.emmanuelcazarez.criteriaforge.core;
 
 import java.util.Objects;
 
-/** Enforces transport-neutral query complexity limits before adapter execution. */
+/** Enforces transport-neutral query complexity limits before query execution. */
 public final class QueryComplexityValidator {
 
     public void validate(QuerySpec query, QueryPolicy policy) {

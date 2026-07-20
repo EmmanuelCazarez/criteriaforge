@@ -9,7 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/** Activates HTTP query binding only when the optional Web adapter is present. */
+/** Activates HTTP query binding only when the optional Web integration is present. */
 @AutoConfiguration(after = CriteriaForgeAutoConfiguration.class)
 @ConditionalOnClass({QueryParameterParser.class, WebMvcConfigurer.class})
 public class CriteriaForgeWebAutoConfiguration {

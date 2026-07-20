@@ -10,7 +10,7 @@
     </parent>
     <artifactId>criteriaforge-spring-web</artifactId>
     <name>CriteriaForge Spring Web</name>
-    <description>Optional HTTP query parameter adapter for CriteriaForge.</description>
+    <description>Optional HTTP query parameter integration for CriteriaForge.</description>
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
