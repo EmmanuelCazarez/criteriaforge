@@ -99,7 +99,6 @@ CI verifies Java 17 against Spring Boot 3.5.16 and 4.1.0, plus H2 and PostgreSQL
 | `criteriaforge-spring-web` | Optional URL parser and `@CriteriaQuery` argument resolver |
 | `criteriaforge-spring-boot-autoconfigure` | Conditional beans and configuration properties |
 | `criteriaforge-spring-boot-starter` | Normal JPA consumer dependency; does not force a web stack |
-| `criteriaforge-test-support` | AssertJ policy assertions for consumer tests |
 | `criteriaforge-example` | Unpublished runnable H2 application |
 
 ## Documentation

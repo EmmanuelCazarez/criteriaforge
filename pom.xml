@@ -42,7 +42,6 @@
         <module>criteriaforge-spring-web</module>
         <module>criteriaforge-spring-boot-autoconfigure</module>
         <module>criteriaforge-spring-boot-starter</module>
-        <module>criteriaforge-test-support</module>
         <module>criteriaforge-example</module>
     </modules>
 

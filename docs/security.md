@@ -68,16 +68,15 @@ criteriaforge:
 
 ## Test the policy
 
-Add `criteriaforge-test-support` with test scope and assert the public surface:
+Use the assertion library already present in the consuming application:
 
 ```java
-import static io.github.emmanuelcazarez.criteriaforge.test.QueryPolicyAssertions.assertThat;
-
-assertThat(policy)
-    .hasMaximumPageSize(50)
-    .doesNotAllowRelationshipTraversal()
-    .allowsFields("id", "reference", "status")
-    .deniesFields("internalRiskScore");
+assertThat(policy.maxPageSize()).isEqualTo(50);
+assertThat(policy.relationshipTraversal()).isFalse();
+assertThat(policy.isFieldAllowed("id")).isTrue();
+assertThat(policy.isFieldAllowed("reference")).isTrue();
+assertThat(policy.isFieldAllowed("status")).isTrue();
+assertThat(policy.isFieldAllowed("internalRiskScore")).isFalse();
 ```
 
 ## Operational guidance

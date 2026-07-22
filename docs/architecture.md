@@ -23,10 +23,7 @@ Spring Boot auto-configuration wires the selected modules when they are present.
 | `criteriaforge-jpa` | Converts the description into a JPA query |
 | `criteriaforge-spring-boot-autoconfigure` | Creates the necessary Spring beans |
 | `criteriaforge-spring-boot-starter` | Convenience dependency |
-| `criteriaforge-test-support` | Consumer testing helpers |
 | `criteriaforge-example` | Demonstrates usage |
-
-`criteriaforge-test-support` is optional and never participates in runtime query execution. Applications that do not need its policy assertions should not depend on it.
 
 Framework-specific modules depend on the smaller modules they extend. Core cannot reference Spring, JPA, servlet APIs, JSON libraries, or RPC libraries; an automated dependency rule enforces this boundary.
 
