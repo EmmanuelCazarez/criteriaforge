@@ -28,6 +28,8 @@ A normal application only needs five concepts:
 
 `QueryEngine.execute(...)` chooses entity or projected execution from the request. Controllers do not branch on projection details.
 
+`FilterExpression` is an opaque composition type. Application code creates expressions with `Filters.eq(...)`, `Filters.and(...)`, `Filters.or(...)`, and `Filters.not(...)`; the concrete expression nodes are internal to the core module. The visitor exposed by `FilterExpression` exists for persistence-adapter implementations, not normal application code.
+
 ## Module responsibilities
 
 | Module | Actual responsibility |

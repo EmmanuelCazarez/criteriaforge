@@ -1,9 +1,7 @@
 package io.github.emmanuelcazarez.criteriaforge.jpa;
 
-import io.github.emmanuelcazarez.criteriaforge.core.Condition;
 import io.github.emmanuelcazarez.criteriaforge.core.FilterExpression;
-import io.github.emmanuelcazarez.criteriaforge.core.FilterGroup;
-import io.github.emmanuelcazarez.criteriaforge.core.Negation;
+import io.github.emmanuelcazarez.criteriaforge.core.Operator;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
@@ -57,35 +55,52 @@ final class JpaPredicateBuilder {
             CriteriaBuilder criteriaBuilder,
             QueryPolicy policy,
             JoinRegistry joins) {
-        if (expression instanceof Condition condition) {
-            return buildCondition(condition, root, criteriaBuilder, policy, joins);
-        }
-        if (expression instanceof Negation negation) {
-            return criteriaBuilder.not(
-                buildNode(negation.expression(), root, criteriaBuilder, policy, joins));
-        }
-        var group = (FilterGroup) expression;
-        var predicates = group.children().stream()
-            .map(child -> buildNode(child, root, criteriaBuilder, policy, joins))
-            .toArray(Predicate[]::new);
-        return group.junction() == FilterGroup.Junction.AND
-            ? criteriaBuilder.and(predicates)
-            : criteriaBuilder.or(predicates);
+        return expression.accept(new FilterExpression.Visitor<>() {
+            @Override
+            public Predicate condition(String field, Operator operator, List<String> values) {
+                return buildCondition(
+                    field, operator, values, root, criteriaBuilder, policy, joins);
+            }
+
+            @Override
+            public Predicate and(List<FilterExpression> expressions) {
+                return criteriaBuilder.and(predicates(expressions));
+            }
+
+            @Override
+            public Predicate or(List<FilterExpression> expressions) {
+                return criteriaBuilder.or(predicates(expressions));
+            }
+
+            @Override
+            public Predicate not(FilterExpression child) {
+                return criteriaBuilder.not(
+                    buildNode(child, root, criteriaBuilder, policy, joins));
+            }
+
+            private Predicate[] predicates(List<FilterExpression> expressions) {
+                return expressions.stream()
+                    .map(child -> buildNode(child, root, criteriaBuilder, policy, joins))
+                    .toArray(Predicate[]::new);
+            }
+        });
     }
 
     private Predicate buildCondition(
-            Condition condition,
+            String field,
+            Operator operator,
+            List<String> values,
             Root<?> root,
             CriteriaBuilder criteriaBuilder,
             QueryPolicy policy,
             JoinRegistry joins) {
-        var resolved = pathResolver.resolve(root, condition.field(), joins);
-        validatePolicy(condition, resolved, policy);
-        compatibility.validate(condition.operator(), resolved.javaType(), condition.field());
-        var typedValues = valueConverter.convertAll(condition.values(), resolved.javaType());
+        var resolved = pathResolver.resolve(root, field, joins);
+        validatePolicy(field, operator, resolved, policy);
+        compatibility.validate(operator, resolved.javaType(), field);
+        var typedValues = valueConverter.convertAll(values, resolved.javaType());
         var path = resolved.path();
 
-        return switch (condition.operator()) {
+        return switch (operator) {
             case EQ -> criteriaBuilder.equal(path, typedValues.get(0));
             case NE -> criteriaBuilder.notEqual(path, typedValues.get(0));
             case GT -> greaterThan(criteriaBuilder, path, typedValues.get(0));
@@ -103,30 +118,30 @@ final class JpaPredicateBuilder {
     }
 
     private static void validatePolicy(
-            Condition condition, JpaResolvedPath resolved, QueryPolicy policy) {
-        if (!policy.isFieldAllowed(condition.field())) {
+            String field, Operator operator, JpaResolvedPath resolved, QueryPolicy policy) {
+        if (!policy.isFieldAllowed(field)) {
             throw new QueryValidationException(
                 QueryErrorCode.FIELD_NOT_ALLOWED,
                 "Field is not allowed by the query policy",
-                condition.field());
+                field);
         }
-        if (!policy.isOperatorAllowed(condition.field(), condition.operator())) {
+        if (!policy.isOperatorAllowed(field, operator)) {
             throw new QueryValidationException(
                 QueryErrorCode.UNSUPPORTED_OPERATOR,
                 "Operator is not allowed for this field",
-                condition.field());
+                field);
         }
         if (resolved.relationshipDepth() > 0 && !policy.relationshipTraversal()) {
             throw new QueryValidationException(
                 QueryErrorCode.RELATIONSHIP_TRAVERSAL_DISABLED,
                 "Relationship traversal is disabled",
-                condition.field());
+                field);
         }
         if (resolved.relationshipDepth() > policy.maxDepth()) {
             throw new QueryValidationException(
                 QueryErrorCode.RELATIONSHIP_DEPTH_EXCEEDED,
                 "Relationship path exceeds maximum depth " + policy.maxDepth(),
-                condition.field());
+                field);
         }
     }
 

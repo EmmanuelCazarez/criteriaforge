@@ -1,6 +1,5 @@
 package io.github.emmanuelcazarez.criteriaforge.web;
 
-import io.github.emmanuelcazarez.criteriaforge.core.Condition;
 import io.github.emmanuelcazarez.criteriaforge.core.FilterExpression;
 import io.github.emmanuelcazarez.criteriaforge.core.Filters;
 import io.github.emmanuelcazarez.criteriaforge.core.Operator;
@@ -49,7 +48,7 @@ public final class DefaultQueryParameterParser implements QueryParameterParser {
         return builder.build();
     }
 
-    private static Condition parseFilter(String name, List<String> rawValues) {
+    private static FilterExpression parseFilter(String name, List<String> rawValues) {
         if (name.isBlank()) {
             throw malformed("Filter name must not be blank", name, null);
         }
@@ -66,19 +65,19 @@ public final class DefaultQueryParameterParser implements QueryParameterParser {
         try {
             return switch (operator) {
                 case IS_NULL, IS_NOT_NULL -> nullCondition(field, operator, values);
-                default -> new Condition(field, operator, values);
+                default -> Filters.condition(field, operator, values.toArray(String[]::new));
             };
         } catch (IllegalArgumentException exception) {
             throw malformed("Malformed filter", field, exception);
         }
     }
 
-    private static Condition nullCondition(
+    private static FilterExpression nullCondition(
             String field, Operator operator, List<String> values) {
         if (values.size() != 1 || !"true".equalsIgnoreCase(values.get(0))) {
             throw new IllegalArgumentException("null operators require the value true");
         }
-        return new Condition(field, operator, List.of());
+        return Filters.condition(field, operator);
     }
 
     private static java.util.Optional<FilterExpression> combine(

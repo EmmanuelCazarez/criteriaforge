@@ -4,10 +4,10 @@ import java.util.List;
 import java.util.Objects;
 
 /** A leaf filter that applies one operator to one persistent field path. */
-public record Condition(String field, Operator operator, List<String> values)
+record Condition(String field, Operator operator, List<String> values)
         implements FilterExpression {
 
-    public Condition {
+    Condition {
         field = QueryPath.requireValid(field, "field");
         operator = Objects.requireNonNull(operator, "operator must not be null");
         values = List.copyOf(Objects.requireNonNull(values, "values must not be null"));
@@ -15,6 +15,11 @@ public record Condition(String field, Operator operator, List<String> values)
             throw new IllegalArgumentException("condition values must not contain null");
         }
         validateArity(operator, values.size());
+    }
+
+    @Override
+    public <T> T accept(Visitor<T> visitor) {
+        return visitor.condition(field, operator, values);
     }
 
     private static void validateArity(Operator operator, int valueCount) {

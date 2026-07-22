@@ -1,9 +1,7 @@
 package io.github.emmanuelcazarez.criteriaforge.jpa;
 
-import io.github.emmanuelcazarez.criteriaforge.core.Condition;
 import io.github.emmanuelcazarez.criteriaforge.core.FilterExpression;
-import io.github.emmanuelcazarez.criteriaforge.core.FilterGroup;
-import io.github.emmanuelcazarez.criteriaforge.core.Negation;
+import io.github.emmanuelcazarez.criteriaforge.core.Operator;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
@@ -14,6 +12,7 @@ import jakarta.persistence.metamodel.ManagedType;
 import jakarta.persistence.metamodel.Metamodel;
 import jakarta.persistence.metamodel.PluralAttribute;
 import java.lang.reflect.AnnotatedElement;
+import java.util.List;
 import java.util.Objects;
 
 /** Performs a metadata-only safety preflight before Criteria query construction. */
@@ -37,25 +36,42 @@ final class JpaQueryPolicyValidator {
 
     private void validateFilter(
             Class<?> entityType, FilterExpression expression, QueryPolicy policy) {
-        if (expression instanceof Condition condition) {
-            var metadata = resolve(entityType, condition.field());
-            validateCommon(condition.field(), metadata, policy);
-            if (!policy.isOperatorAllowed(condition.field(), condition.operator())) {
-                throw rejected(
-                    QueryErrorCode.UNSUPPORTED_OPERATOR,
-                    "Operator is not allowed for this field",
-                    condition.field());
+        expression.accept(new FilterExpression.Visitor<Void>() {
+            @Override
+            public Void condition(String field, Operator operator, List<String> values) {
+                var metadata = resolve(entityType, field);
+                validateCommon(field, metadata, policy);
+                if (!policy.isOperatorAllowed(field, operator)) {
+                    throw rejected(
+                        QueryErrorCode.UNSUPPORTED_OPERATOR,
+                        "Operator is not allowed for this field",
+                        field);
+                }
+                compatibility.validate(operator, metadata.javaType(), field);
+                return null;
             }
-            compatibility.validate(
-                condition.operator(), metadata.javaType(), condition.field());
-            return;
-        }
-        if (expression instanceof Negation negation) {
-            validateFilter(entityType, negation.expression(), policy);
-            return;
-        }
-        ((FilterGroup) expression).children()
-            .forEach(child -> validateFilter(entityType, child, policy));
+
+            @Override
+            public Void and(List<FilterExpression> expressions) {
+                return validateChildren(expressions);
+            }
+
+            @Override
+            public Void or(List<FilterExpression> expressions) {
+                return validateChildren(expressions);
+            }
+
+            @Override
+            public Void not(FilterExpression child) {
+                validateFilter(entityType, child, policy);
+                return null;
+            }
+
+            private Void validateChildren(List<FilterExpression> expressions) {
+                expressions.forEach(child -> validateFilter(entityType, child, policy));
+                return null;
+            }
+        });
     }
 
     private void validateProjection(Class<?> entityType, String field, QueryPolicy policy) {

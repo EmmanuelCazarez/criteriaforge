@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.emmanuelcazarez.criteriaforge.core.QueryResult;
 import java.lang.reflect.Modifier;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,22 @@ class ConsumerApiTest {
                     "io.github.emmanuelcazarez.criteriaforge.jpa." + typeName))
                 .hasValueSatisfying(type -> assertThat(Modifier.isPublic(type.getModifiers()))
                     .isFalse()));
+    }
+
+    @Test
+    void exposesFiltersWithoutConcreteExpressionImplementations() {
+        var expressionType = load(
+            "io.github.emmanuelcazarez.criteriaforge.core.FilterExpression").orElseThrow();
+        var filtersType = load("io.github.emmanuelcazarez.criteriaforge.core.Filters").orElseThrow();
+
+        assertThat(List.of("Condition", "FilterGroup", "Negation"))
+            .allSatisfy(typeName -> assertThat(load(
+                    "io.github.emmanuelcazarez.criteriaforge.core." + typeName))
+                .hasValueSatisfying(type -> assertThat(Modifier.isPublic(type.getModifiers()))
+                    .isFalse()));
+        assertThat(Arrays.stream(filtersType.getMethods())
+                .filter(method -> method.getDeclaringClass().equals(filtersType)))
+            .allSatisfy(method -> assertThat(method.getReturnType()).isEqualTo(expressionType));
     }
 
     private static Optional<Class<?>> load(String typeName) {

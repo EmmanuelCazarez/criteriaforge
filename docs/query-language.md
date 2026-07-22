@@ -20,6 +20,8 @@ var query = QueryRequest.builder()
     .build();
 ```
 
+Use the `Filters` factory methods rather than constructing expression nodes. `FilterExpression` only gives `QueryRequest` and persistence adapters a common type; its concrete representations are not part of the consumer API.
+
 Values enter the model as strings and are converted to the Java type resolved from the JPA metamodel. Supported targets include primitive wrappers, `BigInteger`, `BigDecimal`, booleans, enums, UUIDs, `LocalDate`, `LocalTime`, `LocalDateTime`, `OffsetDateTime`, and `Instant`.
 
 ## Operators

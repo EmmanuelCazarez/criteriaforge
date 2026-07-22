@@ -21,51 +21,51 @@ public final class Filters {
         return new Negation(expression);
     }
 
-    public static Condition eq(String field, String value) {
+    public static FilterExpression eq(String field, String value) {
         return condition(field, Operator.EQ, value);
     }
 
-    public static Condition ne(String field, String value) {
+    public static FilterExpression ne(String field, String value) {
         return condition(field, Operator.NE, value);
     }
 
-    public static Condition gt(String field, String value) {
+    public static FilterExpression gt(String field, String value) {
         return condition(field, Operator.GT, value);
     }
 
-    public static Condition gte(String field, String value) {
+    public static FilterExpression gte(String field, String value) {
         return condition(field, Operator.GTE, value);
     }
 
-    public static Condition lt(String field, String value) {
+    public static FilterExpression lt(String field, String value) {
         return condition(field, Operator.LT, value);
     }
 
-    public static Condition lte(String field, String value) {
+    public static FilterExpression lte(String field, String value) {
         return condition(field, Operator.LTE, value);
     }
 
-    public static Condition like(String field, String value) {
+    public static FilterExpression like(String field, String value) {
         return condition(field, Operator.LIKE, value);
     }
 
-    public static Condition in(String field, String... values) {
+    public static FilterExpression in(String field, String... values) {
         return condition(field, Operator.IN, values);
     }
 
-    public static Condition between(String field, String lower, String upper) {
+    public static FilterExpression between(String field, String lower, String upper) {
         return condition(field, Operator.BETWEEN, lower, upper);
     }
 
-    public static Condition isNull(String field) {
+    public static FilterExpression isNull(String field) {
         return condition(field, Operator.IS_NULL);
     }
 
-    public static Condition isNotNull(String field) {
+    public static FilterExpression isNotNull(String field) {
         return condition(field, Operator.IS_NOT_NULL);
     }
 
-    private static Condition condition(String field, Operator operator, String... values) {
+    public static FilterExpression condition(String field, Operator operator, String... values) {
         return new Condition(field, operator, Arrays.asList(values));
     }
 }
