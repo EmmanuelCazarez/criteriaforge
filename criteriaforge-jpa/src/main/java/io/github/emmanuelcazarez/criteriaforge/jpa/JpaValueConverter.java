@@ -16,7 +16,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 /** Converts transport string values into types resolved from the JPA metamodel. */
-public final class JpaValueConverter {
+final class JpaValueConverter {
 
     public Object convert(String raw, Class<?> targetType) {
         Objects.requireNonNull(raw, "raw value must not be null");

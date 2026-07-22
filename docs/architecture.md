@@ -5,14 +5,28 @@ CriteriaForge is a modular Java library built around a framework-independent que
 ```mermaid
 flowchart LR
     A["HTTP parameters"] --> B["Web parser"]
-    B --> C["QuerySpec"]
-    C --> D["CriteriaForgeExecutor"]
+    B --> C["QueryRequest"]
+    C --> D["QueryEngine"]
     D --> E["Policy validation"]
     E --> F["JPA Criteria query"]
     F --> G["QueryResult"]
 ```
 
 Spring Boot auto-configuration wires the selected modules when they are present.
+
+## Consumer API
+
+A normal application only needs five concepts:
+
+| Concept | Responsibility |
+|---|---|
+| `QueryRequest` | Describes selected fields, filters, sorting, and pagination |
+| `Filters` | Builds programmatic filter expressions when HTTP is not the input |
+| `QueryPolicy` | Limits the fields, operators, relationships, and complexity callers may use |
+| `QueryEngine` | Validates and executes a request for a JPA entity |
+| `QueryResult` | Returns content, total count, offset, and limit |
+
+`QueryEngine.execute(...)` chooses entity or projected execution from the request. Controllers do not branch on projection details.
 
 ## Module responsibilities
 
@@ -31,9 +45,9 @@ Framework-specific modules depend on the smaller modules they extend. Core canno
 
 CriteriaForge handles query description, validation, and execution. It does not define an application's domain architecture. A consuming application typically:
 
-1. Creates `QuerySpec` from HTTP parameters or application code.
+1. Creates `QueryRequest` from HTTP parameters or application code.
 2. Authenticates and authorizes the caller, selects the entity and effective query policy, and applies mandatory scope.
-3. Calls `CriteriaForgeExecutor`, which validates and executes the JPA query.
+3. Calls `QueryEngine`, which validates and executes the JPA query.
 4. Maps `QueryResult` into its own public response contract.
 
 Business decisions, workflows, invariants, authorization, and orchestration remain in the consuming application. CriteriaForge only removes repetitive dynamic-query construction.
@@ -44,8 +58,8 @@ The JPA module performs metadata-only preflight validation before creating execu
 
 ## Extension points
 
-- Create `QuerySpec` from another input mechanism without changing core or JPA.
-- Replace `QueryPolicyResolver` for endpoint- or entity-specific exposure.
+- Create `QueryRequest` from another input mechanism without changing core or JPA.
+- Replace `QueryPolicyProvider` for endpoint- or entity-specific exposure.
 - Replace auto-configured beans with normal application beans.
 - Build another persistence integration from the core query model only when its operator semantics are explicit and separately tested.
 

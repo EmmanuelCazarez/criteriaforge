@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /** Reuses joins by their complete logical path within one Criteria query. */
-public final class JoinRegistry {
+final class JoinRegistry {
     private final From<?, ?> root;
     private final Map<String, From<?, ?>> joins = new LinkedHashMap<>();
 

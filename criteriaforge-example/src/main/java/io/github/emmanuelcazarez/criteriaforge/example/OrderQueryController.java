@@ -1,27 +1,25 @@
 package io.github.emmanuelcazarez.criteriaforge.example;
 
 import io.github.emmanuelcazarez.criteriaforge.core.QueryResult;
-import io.github.emmanuelcazarez.criteriaforge.core.QuerySpec;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.example.domain.Order;
-import io.github.emmanuelcazarez.criteriaforge.jpa.CriteriaForgeExecutor;
-import io.github.emmanuelcazarez.criteriaforge.web.annotation.CriteriaQuery;
+import io.github.emmanuelcazarez.criteriaforge.jpa.QueryEngine;
+import io.github.emmanuelcazarez.criteriaforge.web.annotation.DynamicQuery;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/orders")
-class OrderQueryController {
-    private final CriteriaForgeExecutor executor;
+public class OrderQueryController {
+    private final QueryEngine queryEngine;
 
-    OrderQueryController(CriteriaForgeExecutor executor) {
-        this.executor = executor;
+    OrderQueryController(QueryEngine queryEngine) {
+        this.queryEngine = queryEngine;
     }
 
     @GetMapping
-    QueryResult<?> findAll(@CriteriaQuery QuerySpec query) {
-        return query.fields().isEmpty()
-            ? executor.findAll(Order.class, query)
-            : executor.findProjected(Order.class, query);
+    QueryResult<?> findAll(@DynamicQuery QueryRequest query) {
+        return queryEngine.execute(Order.class, query);
     }
 }

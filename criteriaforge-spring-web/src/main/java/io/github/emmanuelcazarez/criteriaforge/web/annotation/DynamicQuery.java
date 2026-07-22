@@ -5,8 +5,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** Binds request query parameters to a CriteriaForge query specification. */
+/** Binds HTTP query parameters to a CriteriaForge query request. */
 @Target(ElementType.PARAMETER)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface CriteriaQuery {
+public @interface DynamicQuery {
 }

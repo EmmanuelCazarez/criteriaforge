@@ -1,7 +1,7 @@
 package io.github.emmanuelcazarez.criteriaforge.web;
 
-import io.github.emmanuelcazarez.criteriaforge.core.QuerySpec;
-import io.github.emmanuelcazarez.criteriaforge.web.annotation.CriteriaQuery;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
+import io.github.emmanuelcazarez.criteriaforge.web.annotation.DynamicQuery;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Arrays;
 import java.util.Objects;
@@ -12,22 +12,22 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
-/** Resolves {@link CriteriaQuery}-annotated controller parameters. */
-public final class CriteriaQueryArgumentResolver implements HandlerMethodArgumentResolver {
+/** Resolves {@link DynamicQuery}-annotated controller parameters. */
+public final class DynamicQueryArgumentResolver implements HandlerMethodArgumentResolver {
     private final QueryParameterParser parser;
 
-    public CriteriaQueryArgumentResolver(QueryParameterParser parser) {
+    public DynamicQueryArgumentResolver(QueryParameterParser parser) {
         this.parser = Objects.requireNonNull(parser, "parser must not be null");
     }
 
     @Override
     public boolean supportsParameter(MethodParameter parameter) {
-        return parameter.getParameterType() == QuerySpec.class
-            && parameter.hasParameterAnnotation(CriteriaQuery.class);
+        return parameter.getParameterType() == QueryRequest.class
+            && parameter.hasParameterAnnotation(DynamicQuery.class);
     }
 
     @Override
-    public QuerySpec resolveArgument(
+    public QueryRequest resolveArgument(
             MethodParameter parameter,
             ModelAndViewContainer modelAndViewContainer,
             NativeWebRequest webRequest,

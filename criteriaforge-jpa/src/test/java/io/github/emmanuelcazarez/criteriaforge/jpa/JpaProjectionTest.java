@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.emmanuelcazarez.criteriaforge.core.PageSpec;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
-import io.github.emmanuelcazarez.criteriaforge.core.QuerySpec;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
 import io.github.emmanuelcazarez.criteriaforge.core.SortSpec;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.CustomerEntity;
@@ -28,7 +28,7 @@ class JpaProjectionTest {
     @Autowired
     private EntityManager entityManager;
 
-    private CriteriaForgeExecutor executor;
+    private JpaQueryEngine executor;
 
     @BeforeEach
     void setUp() {
@@ -43,12 +43,12 @@ class JpaProjectionTest {
         var policy = QueryPolicy.builder()
             .relationshipTraversal(true)
             .build();
-        executor = new DefaultCriteriaForgeExecutor(entityManager, ignored -> policy);
+        executor = new JpaQueryEngine(entityManager, ignored -> policy);
     }
 
     @Test
     void selectsOrderedRootAndNestedFieldsAndSortsByAnUnselectedField() {
-        var query = QuerySpec.builder()
+        var query = QueryRequest.builder()
             .select("reference", "customer.name", "customer.country")
             .sort(SortSpec.desc("total"))
             .page(PageSpec.offset(0, 2))
@@ -72,7 +72,7 @@ class JpaProjectionTest {
 
     @Test
     void rejectsProjectionThroughAToManyRelationship() {
-        var query = QuerySpec.builder().select("items.product.name").build();
+        var query = QueryRequest.builder().select("items.product.name").build();
 
         assertThatThrownBy(() -> executor.findProjected(OrderEntity.class, query))
             .isInstanceOfSatisfying(QueryValidationException.class, error -> {
@@ -85,7 +85,7 @@ class JpaProjectionTest {
     void requiresAtLeastOneProjectionField() {
         assertThatThrownBy(() -> executor.findProjected(
             OrderEntity.class,
-            QuerySpec.builder().build()))
+            QueryRequest.builder().build()))
             .isInstanceOfSatisfying(QueryValidationException.class, error ->
                 assertThat(error.code()).isEqualTo(QueryErrorCode.MALFORMED_QUERY));
     }

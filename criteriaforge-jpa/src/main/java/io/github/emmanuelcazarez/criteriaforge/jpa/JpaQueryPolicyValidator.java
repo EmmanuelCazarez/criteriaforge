@@ -6,7 +6,7 @@ import io.github.emmanuelcazarez.criteriaforge.core.FilterGroup;
 import io.github.emmanuelcazarez.criteriaforge.core.Negation;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
-import io.github.emmanuelcazarez.criteriaforge.core.QuerySpec;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
 import io.github.emmanuelcazarez.criteriaforge.core.annotation.QueryHidden;
 import jakarta.persistence.metamodel.Attribute;
@@ -25,7 +25,7 @@ final class JpaQueryPolicyValidator {
         this.metamodel = Objects.requireNonNull(metamodel, "metamodel must not be null");
     }
 
-    void validate(Class<?> entityType, QuerySpec query, QueryPolicy policy) {
+    void validate(Class<?> entityType, QueryRequest query, QueryPolicy policy) {
         Objects.requireNonNull(entityType, "entityType must not be null");
         Objects.requireNonNull(query, "query must not be null");
         Objects.requireNonNull(policy, "policy must not be null");

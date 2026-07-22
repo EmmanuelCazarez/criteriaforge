@@ -7,7 +7,7 @@ import io.github.emmanuelcazarez.criteriaforge.core.Filters;
 import io.github.emmanuelcazarez.criteriaforge.core.Operator;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
-import io.github.emmanuelcazarez.criteriaforge.core.QuerySpec;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.OrderEntity;
 import jakarta.persistence.EntityManager;
@@ -37,7 +37,7 @@ class JpaQueryPolicyValidatorTest {
 
     @Test
     void rejectsQueryHiddenFieldsBeforeExecutingSql() {
-        var query = QuerySpec.builder().where(Filters.eq("secretNote", "value")).build();
+        var query = QueryRequest.builder().where(Filters.eq("secretNote", "value")).build();
 
         assertRejected(query, QueryPolicy.defaults(), QueryErrorCode.FIELD_NOT_ALLOWED);
     }
@@ -50,7 +50,7 @@ class JpaQueryPolicyValidatorTest {
             .build();
 
         assertRejected(
-            QuerySpec.builder().where(Filters.eq("reference", "A")).build(),
+            QueryRequest.builder().where(Filters.eq("reference", "A")).build(),
             policy,
             QueryErrorCode.FIELD_NOT_ALLOWED);
     }
@@ -58,7 +58,7 @@ class JpaQueryPolicyValidatorTest {
     @Test
     void relationshipTraversalIsDisabledByDefault() {
         assertRejected(
-            QuerySpec.builder().where(Filters.eq("customer.name", "Ana")).build(),
+            QueryRequest.builder().where(Filters.eq("customer.name", "Ana")).build(),
             QueryPolicy.defaults(),
             QueryErrorCode.RELATIONSHIP_TRAVERSAL_DISABLED);
     }
@@ -70,7 +70,7 @@ class JpaQueryPolicyValidatorTest {
             .maxDepth(0)
             .build();
         assertRejected(
-            QuerySpec.builder().where(Filters.eq("customer.name", "Ana")).build(),
+            QueryRequest.builder().where(Filters.eq("customer.name", "Ana")).build(),
             shallow,
             QueryErrorCode.RELATIONSHIP_DEPTH_EXCEEDED);
 
@@ -78,7 +78,7 @@ class JpaQueryPolicyValidatorTest {
             .allowOperators("total", Operator.EQ)
             .build();
         assertRejected(
-            QuerySpec.builder().where(Filters.gt("total", "10")).build(),
+            QueryRequest.builder().where(Filters.gt("total", "10")).build(),
             equalityOnly,
             QueryErrorCode.UNSUPPORTED_OPERATOR);
     }
@@ -86,14 +86,14 @@ class JpaQueryPolicyValidatorTest {
     @Test
     void toManyProjectionIsRejectedDuringPreflight() {
         assertRejected(
-            QuerySpec.builder().select("items.product.name").build(),
+            QueryRequest.builder().select("items.product.name").build(),
             QueryPolicy.builder().relationshipTraversal(true).build(),
             QueryErrorCode.UNSUPPORTED_PROJECTION);
     }
 
     private void assertRejected(
-            QuerySpec query, QueryPolicy policy, QueryErrorCode expectedCode) {
-        var executor = new DefaultCriteriaForgeExecutor(entityManager, ignored -> policy);
+            QueryRequest query, QueryPolicy policy, QueryErrorCode expectedCode) {
+        var executor = new JpaQueryEngine(entityManager, ignored -> policy);
 
         assertThatThrownBy(() -> {
             if (query.fields().isEmpty()) {

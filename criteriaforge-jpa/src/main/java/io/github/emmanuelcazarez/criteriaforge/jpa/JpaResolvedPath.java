@@ -4,7 +4,7 @@ import jakarta.persistence.criteria.Path;
 import java.util.Objects;
 
 /** JPA path metadata resolved from a logical dotted field path. */
-public record JpaResolvedPath(
+record JpaResolvedPath(
         Path<?> path, Class<?> javaType, boolean plural, int relationshipDepth) {
 
     public JpaResolvedPath {

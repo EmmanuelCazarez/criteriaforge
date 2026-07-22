@@ -3,9 +3,9 @@ package io.github.emmanuelcazarez.criteriaforge.autoconfigure;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.emmanuelcazarez.criteriaforge.core.QueryResult;
-import io.github.emmanuelcazarez.criteriaforge.core.QuerySpec;
-import io.github.emmanuelcazarez.criteriaforge.jpa.CriteriaForgeExecutor;
-import io.github.emmanuelcazarez.criteriaforge.jpa.QueryPolicyResolver;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
+import io.github.emmanuelcazarez.criteriaforge.jpa.QueryEngine;
+import io.github.emmanuelcazarez.criteriaforge.jpa.QueryPolicyProvider;
 import io.github.emmanuelcazarez.criteriaforge.web.CriteriaForgeWebMvcConfigurer;
 import io.github.emmanuelcazarez.criteriaforge.web.QueryParameterParser;
 import jakarta.persistence.EntityManager;
@@ -13,7 +13,6 @@ import jakarta.persistence.EntityManagerFactory;
 import jakarta.persistence.metamodel.Metamodel;
 import java.lang.reflect.Proxy;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -28,11 +27,11 @@ class CriteriaForgeAutoConfigurationTest {
             CriteriaForgeWebAutoConfiguration.class));
 
     @Test
-    void configuresTheExecutorAndDefaultPolicyWhenJpaIsAvailable() {
+    void configuresTheQueryEngineAndDefaultPolicyWhenJpaIsAvailable() {
         contextRunner.withUserConfiguration(JpaBeans.class).run(context -> {
-            assertThat(context).hasSingleBean(CriteriaForgeExecutor.class);
-            assertThat(context).hasSingleBean(QueryPolicyResolver.class);
-            var policy = context.getBean(QueryPolicyResolver.class).resolve(Object.class);
+            assertThat(context).hasSingleBean(QueryEngine.class);
+            assertThat(context).hasSingleBean(QueryPolicyProvider.class);
+            var policy = context.getBean(QueryPolicyProvider.class).policyFor(Object.class);
             assertThat(policy.maxPageSize()).isEqualTo(100);
             assertThat(policy.maxConditions()).isEqualTo(25);
             assertThat(policy.maxDepth()).isEqualTo(2);
@@ -50,7 +49,7 @@ class CriteriaForgeAutoConfigurationTest {
                 "criteriaforge.query.max-depth=1",
                 "criteriaforge.query.relationship-traversal=true")
             .run(context -> {
-                var policy = context.getBean(QueryPolicyResolver.class).resolve(Object.class);
+                var policy = context.getBean(QueryPolicyProvider.class).policyFor(Object.class);
                 assertThat(policy.maxPageSize()).isEqualTo(40);
                 assertThat(policy.maxConditions()).isEqualTo(12);
                 assertThat(policy.maxDepth()).isEqualTo(1);
@@ -61,14 +60,14 @@ class CriteriaForgeAutoConfigurationTest {
     @Test
     void backsOffForConsumerBeansAndWithoutJpa() {
         contextRunner
-            .withUserConfiguration(JpaBeans.class, ConsumerExecutor.class)
+            .withUserConfiguration(JpaBeans.class, ConsumerQueryEngine.class)
             .run(context -> assertThat(context)
-                .hasSingleBean(CriteriaForgeExecutor.class)
-                .getBean(CriteriaForgeExecutor.class)
-                .isSameAs(context.getBean("consumerCriteriaForgeExecutor")));
+                .hasSingleBean(QueryEngine.class)
+                .getBean(QueryEngine.class)
+                .isSameAs(context.getBean("consumerQueryEngine")));
 
         contextRunner.run(context -> assertThat(context)
-            .doesNotHaveBean(CriteriaForgeExecutor.class));
+            .doesNotHaveBean(QueryEngine.class));
     }
 
     @Test
@@ -99,18 +98,12 @@ class CriteriaForgeAutoConfigurationTest {
     }
 
     @Configuration(proxyBeanMethods = false)
-    static class ConsumerExecutor {
+    static class ConsumerQueryEngine {
         @Bean
-        CriteriaForgeExecutor consumerCriteriaForgeExecutor() {
-            return new CriteriaForgeExecutor() {
+        QueryEngine consumerQueryEngine() {
+            return new QueryEngine() {
                 @Override
-                public <T> QueryResult<T> findAll(Class<T> entityType, QuerySpec query) {
-                    return new QueryResult<>(List.of(), 0, 0, 1);
-                }
-
-                @Override
-                public QueryResult<Map<String, Object>> findProjected(
-                        Class<?> entityType, QuerySpec query) {
+                public QueryResult<?> execute(Class<?> entityType, QueryRequest query) {
                     return new QueryResult<>(List.of(), 0, 0, 1);
                 }
             };

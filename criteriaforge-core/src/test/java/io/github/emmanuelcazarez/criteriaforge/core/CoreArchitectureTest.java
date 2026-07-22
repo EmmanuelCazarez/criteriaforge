@@ -13,7 +13,7 @@ class CoreArchitectureTest {
 
     @Test
     void consumerApiRemainsInSingleCorePackage() {
-        assertThat(QuerySpec.class.getPackageName()).isEqualTo(CORE_PACKAGE);
+        assertThat(QueryRequest.class.getPackageName()).isEqualTo(CORE_PACKAGE);
         assertThat(FilterExpression.class.getPackageName()).isEqualTo(CORE_PACKAGE);
         assertThat(QueryPolicy.class.getPackageName()).isEqualTo(CORE_PACKAGE);
         assertThat(CriteriaForgeException.class.getPackageName()).isEqualTo(CORE_PACKAGE);

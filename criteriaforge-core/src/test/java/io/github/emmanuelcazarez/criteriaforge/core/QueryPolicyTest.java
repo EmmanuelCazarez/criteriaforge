@@ -22,7 +22,7 @@ class QueryPolicyTest {
 
     @Test
     void defaultPolicyRejectsOversizedPages() {
-        var query = QuerySpec.builder().page(PageSpec.offset(0, 101)).build();
+        var query = QueryRequest.builder().page(PageSpec.offset(0, 101)).build();
 
         assertThatThrownBy(() -> validator.validate(query, QueryPolicy.defaults()))
             .isInstanceOfSatisfying(QueryValidationException.class, error -> {
@@ -33,7 +33,7 @@ class QueryPolicyTest {
 
     @Test
     void countsConditionsAcrossNestedGroupsAndNegations() {
-        var query = QuerySpec.builder().where(Filters.and(
+        var query = QueryRequest.builder().where(Filters.and(
             Filters.eq("a", "1"),
             Filters.not(Filters.or(
                 Filters.eq("b", "2"),

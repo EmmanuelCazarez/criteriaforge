@@ -1,6 +1,6 @@
 # Query language
 
-CriteriaForge uses `QuerySpec` as its transport-neutral query model. A specification contains an optional filter expression tree, ordered projection fields, ordered sort fields, and optional offset pagination. All public collections are immutable after construction.
+CriteriaForge uses `QueryRequest` as its transport-neutral query model. A request contains an optional filter expression tree, ordered projection fields, ordered sort fields, and optional offset pagination. All public collections are immutable after construction.
 
 ## Programmatic queries
 
@@ -9,7 +9,7 @@ import static io.github.emmanuelcazarez.criteriaforge.core.Filters.*;
 import static io.github.emmanuelcazarez.criteriaforge.core.PageSpec.offset;
 import static io.github.emmanuelcazarez.criteriaforge.core.SortSpec.desc;
 
-var query = QuerySpec.builder()
+var query = QueryRequest.builder()
     .select("id", "customer.name", "total")
     .where(and(
         eq("status", "PAID"),
@@ -56,7 +56,7 @@ status_eq=PAID&total_gte=100&OR_status_eq=CREATED
 
 means `(status = PAID AND total >= 100) OR status = CREATED`.
 
-The compact URL syntax intentionally supports flat alternatives only. Build `QuerySpec` directly for arbitrarily nested `AND`, `OR`, and `NOT` groups.
+The compact URL syntax intentionally supports flat alternatives only. Build `QueryRequest` directly for arbitrarily nested `AND`, `OR`, and `NOT` groups.
 
 Repeated and comma-separated values are equivalent for membership:
 
@@ -94,7 +94,7 @@ fields=id,customer.name,customer.country,total
 }
 ```
 
-Call `findAll` when no fields are selected and `findProjected` when fields are present.
+Call `QueryEngine.execute(...)` in both cases. The engine returns full entities when `fields` is absent and projected maps when fields are selected.
 
 ## Sorting and pagination
 

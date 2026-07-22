@@ -32,11 +32,11 @@ Do not rely on naming conventions such as `secret` or `password`. Mark every sen
 
 ## Prefer allowlists for public APIs
 
-Supply a `QueryPolicyResolver` bean to replace the global default and resolve policy by entity:
+Supply a `QueryPolicyProvider` bean to replace the global default and resolve policy by entity:
 
 ```java
 @Bean
-QueryPolicyResolver queryPolicyResolver() {
+QueryPolicyProvider queryPolicyProvider() {
     return entityType -> {
         if (entityType == Order.class) {
             return QueryPolicy.builder()

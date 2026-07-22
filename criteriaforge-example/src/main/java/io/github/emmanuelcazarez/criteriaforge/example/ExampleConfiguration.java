@@ -6,7 +6,7 @@ import io.github.emmanuelcazarez.criteriaforge.example.domain.CustomerRepository
 import io.github.emmanuelcazarez.criteriaforge.example.domain.Order;
 import io.github.emmanuelcazarez.criteriaforge.example.domain.OrderRepository;
 import io.github.emmanuelcazarez.criteriaforge.example.domain.OrderStatus;
-import io.github.emmanuelcazarez.criteriaforge.jpa.QueryPolicyResolver;
+import io.github.emmanuelcazarez.criteriaforge.jpa.QueryPolicyProvider;
 import java.math.BigDecimal;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
@@ -16,7 +16,7 @@ import org.springframework.context.annotation.Configuration;
 class ExampleConfiguration {
 
     @Bean
-    QueryPolicyResolver exampleQueryPolicy() {
+    QueryPolicyProvider exampleQueryPolicy() {
         var policy = QueryPolicy.builder()
             .relationshipTraversal(true)
             .maxPageSize(100)

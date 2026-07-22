@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /** Reconstructs ordered nested maps from flat Criteria tuple selections. */
-public final class NestedMapAssembler {
+final class NestedMapAssembler {
 
     public Map<String, Object> assemble(List<String> paths, List<?> values) {
         Objects.requireNonNull(paths, "paths must not be null");

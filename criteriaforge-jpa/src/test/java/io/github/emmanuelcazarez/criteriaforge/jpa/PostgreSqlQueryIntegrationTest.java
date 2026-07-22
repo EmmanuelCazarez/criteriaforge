@@ -5,7 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.github.emmanuelcazarez.criteriaforge.core.Filters;
 import io.github.emmanuelcazarez.criteriaforge.core.PageSpec;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
-import io.github.emmanuelcazarez.criteriaforge.core.QuerySpec;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.SortSpec;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.CustomerEntity;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.OrderEntity;
@@ -48,7 +48,7 @@ class PostgreSqlQueryIntegrationTest {
     @Autowired
     private EntityManager entityManager;
 
-    private CriteriaForgeExecutor executor;
+    private JpaQueryEngine executor;
 
     @BeforeEach
     void setUp() {
@@ -84,12 +84,12 @@ class PostgreSqlQueryIntegrationTest {
             .maxPageSize(10)
             .relationshipTraversal(true)
             .build();
-        executor = new DefaultCriteriaForgeExecutor(entityManager, ignored -> policy);
+        executor = new JpaQueryEngine(entityManager, ignored -> policy);
     }
 
     @Test
     void preservesPostgreSqlTextDecimalEnumAndOffsetDateTimeSemantics() {
-        var query = QuerySpec.builder()
+        var query = QueryRequest.builder()
             .where(Filters.and(
                 Filters.like("reference", "alpha-%"),
                 Filters.eq("status", "paid"),
@@ -110,7 +110,7 @@ class PostgreSqlQueryIntegrationTest {
 
     @Test
     void keepsDistinctPaginationAndCountsAcrossPluralJoins() {
-        var query = QuerySpec.builder()
+        var query = QueryRequest.builder()
             .where(Filters.eq("items.product.name", "Widget"))
             .sort(SortSpec.asc("reference"))
             .page(PageSpec.offset(0, 1))

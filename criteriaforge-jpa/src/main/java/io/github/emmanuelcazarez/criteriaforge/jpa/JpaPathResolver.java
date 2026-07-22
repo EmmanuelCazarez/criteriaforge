@@ -12,7 +12,7 @@ import jakarta.persistence.metamodel.PluralAttribute;
 import java.util.Objects;
 
 /** Resolves dotted query fields with the JPA metamodel instead of string assumptions. */
-public final class JpaPathResolver {
+final class JpaPathResolver {
     private final Metamodel metamodel;
 
     public JpaPathResolver(Metamodel metamodel) {

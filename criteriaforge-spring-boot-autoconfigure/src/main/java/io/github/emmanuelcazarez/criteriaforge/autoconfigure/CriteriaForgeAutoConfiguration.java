@@ -1,8 +1,8 @@
 package io.github.emmanuelcazarez.criteriaforge.autoconfigure;
 
-import io.github.emmanuelcazarez.criteriaforge.jpa.CriteriaForgeExecutor;
-import io.github.emmanuelcazarez.criteriaforge.jpa.DefaultCriteriaForgeExecutor;
-import io.github.emmanuelcazarez.criteriaforge.jpa.QueryPolicyResolver;
+import io.github.emmanuelcazarez.criteriaforge.jpa.JpaQueryEngine;
+import io.github.emmanuelcazarez.criteriaforge.jpa.QueryEngine;
+import io.github.emmanuelcazarez.criteriaforge.jpa.QueryPolicyProvider;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityManagerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -19,13 +19,13 @@ import org.springframework.context.annotation.Bean;
     "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration",
     "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration"
 })
-@ConditionalOnClass({EntityManager.class, CriteriaForgeExecutor.class})
+@ConditionalOnClass({EntityManager.class, QueryEngine.class})
 @EnableConfigurationProperties(CriteriaForgeProperties.class)
 public class CriteriaForgeAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    QueryPolicyResolver criteriaForgeQueryPolicyResolver(CriteriaForgeProperties properties) {
+    QueryPolicyProvider criteriaForgeQueryPolicyProvider(CriteriaForgeProperties properties) {
         var policy = properties.toPolicy();
         return ignored -> policy;
     }
@@ -33,8 +33,8 @@ public class CriteriaForgeAutoConfiguration {
     @Bean
     @ConditionalOnBean(EntityManagerFactory.class)
     @ConditionalOnMissingBean
-    CriteriaForgeExecutor criteriaForgeExecutor(
-            EntityManager entityManager, QueryPolicyResolver policyResolver) {
-        return new DefaultCriteriaForgeExecutor(entityManager, policyResolver);
+    QueryEngine criteriaForgeQueryEngine(
+            EntityManager entityManager, QueryPolicyProvider policyProvider) {
+        return new JpaQueryEngine(entityManager, policyProvider);
     }
 }

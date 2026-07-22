@@ -6,7 +6,7 @@ import io.github.emmanuelcazarez.criteriaforge.core.Filters;
 import io.github.emmanuelcazarez.criteriaforge.core.Operator;
 import io.github.emmanuelcazarez.criteriaforge.core.PageSpec;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
-import io.github.emmanuelcazarez.criteriaforge.core.QuerySpec;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
 import io.github.emmanuelcazarez.criteriaforge.core.SortSpec;
 import java.util.ArrayList;
@@ -27,7 +27,7 @@ public final class DefaultQueryParameterParser implements QueryParameterParser {
     private static final Map<String, Operator> SUFFIX_OPERATORS = suffixOperators();
 
     @Override
-    public QuerySpec parse(MultiValueMap<String, String> parameters) {
+    public QueryRequest parse(MultiValueMap<String, String> parameters) {
         Objects.requireNonNull(parameters, "parameters must not be null");
         var normalFilters = new ArrayList<FilterExpression>();
         var alternativeFilters = new ArrayList<FilterExpression>();
@@ -41,7 +41,7 @@ public final class DefaultQueryParameterParser implements QueryParameterParser {
             }
         });
 
-        var builder = QuerySpec.builder();
+        var builder = QueryRequest.builder();
         splitValues(parameters.get("fields")).forEach(field -> builder.select(field));
         splitValues(parameters.get("sort")).forEach(token -> builder.sort(parseSort(token)));
         combine(normalFilters, alternativeFilters).ifPresent(builder::where);

@@ -7,10 +7,10 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /** Registers CriteriaForge's optional MVC query argument resolver. */
 public final class CriteriaForgeWebMvcConfigurer implements WebMvcConfigurer {
-    private final CriteriaQueryArgumentResolver resolver;
+    private final DynamicQueryArgumentResolver resolver;
 
     public CriteriaForgeWebMvcConfigurer(QueryParameterParser parser) {
-        resolver = new CriteriaQueryArgumentResolver(
+        resolver = new DynamicQueryArgumentResolver(
             Objects.requireNonNull(parser, "parser must not be null"));
     }
 

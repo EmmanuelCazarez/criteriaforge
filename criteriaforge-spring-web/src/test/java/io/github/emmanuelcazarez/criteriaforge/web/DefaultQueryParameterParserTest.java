@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.github.emmanuelcazarez.criteriaforge.core.Filters;
 import io.github.emmanuelcazarez.criteriaforge.core.PageSpec;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
-import io.github.emmanuelcazarez.criteriaforge.core.QuerySpec;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
 import io.github.emmanuelcazarez.criteriaforge.core.SortSpec;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ class DefaultQueryParameterParserTest {
 
         var parsed = parser.parse(parameters);
 
-        var expected = QuerySpec.builder()
+        var expected = QueryRequest.builder()
             .select("reference", "customer.name", "total")
             .where(Filters.and(
                 Filters.eq("status", "PAID"),

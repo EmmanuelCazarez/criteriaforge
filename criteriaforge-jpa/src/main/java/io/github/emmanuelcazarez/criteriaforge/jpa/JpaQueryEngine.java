@@ -5,7 +5,7 @@ import io.github.emmanuelcazarez.criteriaforge.core.QueryComplexityValidator;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryResult;
-import io.github.emmanuelcazarez.criteriaforge.core.QuerySpec;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
@@ -17,10 +17,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.IntStream;
 
-/** Default Criteria API implementation of {@link CriteriaForgeExecutor}. */
-public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor {
+/** Default Criteria API implementation of {@link QueryEngine}. */
+public final class JpaQueryEngine implements QueryEngine {
     private final EntityManager entityManager;
-    private final QueryPolicyResolver policyResolver;
+    private final QueryPolicyProvider policyProvider;
     private final QueryComplexityValidator complexityValidator = new QueryComplexityValidator();
     private final JpaPredicateBuilder predicateBuilder;
     private final JpaSortBuilder sortBuilder;
@@ -28,11 +28,11 @@ public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor
     private final JpaQueryPolicyValidator policyValidator;
     private final NestedMapAssembler mapAssembler = new NestedMapAssembler();
 
-    public DefaultCriteriaForgeExecutor(
-            EntityManager entityManager, QueryPolicyResolver policyResolver) {
+    public JpaQueryEngine(
+            EntityManager entityManager, QueryPolicyProvider policyProvider) {
         this.entityManager = Objects.requireNonNull(entityManager, "entityManager must not be null");
-        this.policyResolver = Objects.requireNonNull(
-            policyResolver, "policyResolver must not be null");
+        this.policyProvider = Objects.requireNonNull(
+            policyProvider, "policyProvider must not be null");
         var pathResolver = new JpaPathResolver(entityManager.getMetamodel());
         predicateBuilder = new JpaPredicateBuilder(pathResolver, new JpaValueConverter());
         sortBuilder = new JpaSortBuilder(pathResolver);
@@ -41,7 +41,14 @@ public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor
     }
 
     @Override
-    public <T> QueryResult<T> findAll(Class<T> entityType, QuerySpec query) {
+    public QueryResult<?> execute(Class<?> entityType, QueryRequest query) {
+        Objects.requireNonNull(query, "query must not be null");
+        return query.fields().isEmpty()
+            ? findAll(entityType, query)
+            : findProjected(entityType, query);
+    }
+
+    <T> QueryResult<T> findAll(Class<T> entityType, QueryRequest query) {
         Objects.requireNonNull(entityType, "entityType must not be null");
         Objects.requireNonNull(query, "query must not be null");
         if (!query.fields().isEmpty()) {
@@ -51,7 +58,7 @@ public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor
         }
 
         var policy = Objects.requireNonNull(
-            policyResolver.resolve(entityType), "resolved query policy must not be null");
+            policyProvider.policyFor(entityType), "provided query policy must not be null");
         complexityValidator.validate(query, policy);
         policyValidator.validate(entityType, query, policy);
         var page = query.page().orElse(PageSpec.offset(0, policy.maxPageSize()));
@@ -80,9 +87,8 @@ public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor
         return new QueryResult<>(content, total, page.offset(), page.limit());
     }
 
-    @Override
-    public QueryResult<Map<String, Object>> findProjected(
-            Class<?> entityType, QuerySpec query) {
+    QueryResult<Map<String, Object>> findProjected(
+            Class<?> entityType, QueryRequest query) {
         Objects.requireNonNull(entityType, "entityType must not be null");
         Objects.requireNonNull(query, "query must not be null");
         if (query.fields().isEmpty()) {
@@ -92,7 +98,7 @@ public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor
         }
 
         var policy = Objects.requireNonNull(
-            policyResolver.resolve(entityType), "resolved query policy must not be null");
+            policyProvider.policyFor(entityType), "provided query policy must not be null");
         complexityValidator.validate(query, policy);
         policyValidator.validate(entityType, query, policy);
         var page = query.page().orElse(PageSpec.offset(0, policy.maxPageSize()));
@@ -129,7 +135,7 @@ public final class DefaultCriteriaForgeExecutor implements CriteriaForgeExecutor
             .toList();
     }
 
-    private <T> long count(Class<T> entityType, QuerySpec query, QueryPolicy policy) {
+    private <T> long count(Class<T> entityType, QueryRequest query, QueryPolicy policy) {
         var criteriaBuilder = entityManager.getCriteriaBuilder();
         var countQuery = criteriaBuilder.createQuery(Long.class);
         var countRoot = countQuery.from(entityType);

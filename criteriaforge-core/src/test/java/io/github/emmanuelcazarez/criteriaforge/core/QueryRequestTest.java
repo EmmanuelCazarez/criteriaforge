@@ -8,12 +8,12 @@ import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
-class QuerySpecTest {
+class QueryRequestTest {
 
     @Test
     void buildsANestedQueryWithoutSharingMutableCollections() {
         var fields = new ArrayList<>(List.of("id", "customer.name"));
-        var query = QuerySpec.builder()
+        var query = QueryRequest.builder()
             .select(fields)
             .where(Filters.and(
                 Filters.eq("status", "PAID"),
@@ -49,7 +49,7 @@ class QuerySpecTest {
     void rejectsInvalidPagesAndDuplicateProjectionFields() {
         assertThatIllegalArgumentException().isThrownBy(() -> PageSpec.offset(-1, 20));
         assertThatIllegalArgumentException().isThrownBy(() -> PageSpec.offset(0, 0));
-        assertThatIllegalArgumentException().isThrownBy(() -> QuerySpec.builder()
+        assertThatIllegalArgumentException().isThrownBy(() -> QueryRequest.builder()
             .select("id", "id")
             .build());
     }

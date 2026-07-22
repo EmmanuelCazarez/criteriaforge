@@ -17,7 +17,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 /** Builds typed Criteria predicates from the core filter expression tree. */
-public final class JpaPredicateBuilder {
+final class JpaPredicateBuilder {
     private final JpaPathResolver pathResolver;
     private final JpaValueConverter valueConverter;
     private final OperatorCompatibility compatibility = new OperatorCompatibility();

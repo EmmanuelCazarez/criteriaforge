@@ -8,14 +8,14 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-/** Immutable, transport-neutral description of a dynamic query. */
-public record QuerySpec(
+/** Immutable, transport-neutral dynamic query request. */
+public record QueryRequest(
         List<String> fields,
         Optional<FilterExpression> filter,
         List<SortSpec> sorts,
         Optional<PageSpec> page) {
 
-    public QuerySpec {
+    public QueryRequest {
         fields = validateFields(fields);
         filter = Objects.requireNonNull(filter, "filter must not be null");
         sorts = List.copyOf(Objects.requireNonNull(sorts, "sorts must not be null"));
@@ -40,7 +40,7 @@ public record QuerySpec(
         return List.copyOf(validated);
     }
 
-    /** Mutable builder that creates an immutable {@link QuerySpec}. */
+    /** Mutable builder that creates an immutable {@link QueryRequest}. */
     public static final class Builder {
         private final List<String> fields = new ArrayList<>();
         private final List<SortSpec> sorts = new ArrayList<>();
@@ -74,8 +74,8 @@ public record QuerySpec(
             return this;
         }
 
-        public QuerySpec build() {
-            return new QuerySpec(
+        public QueryRequest build() {
+            return new QueryRequest(
                 fields,
                 Optional.ofNullable(filter),
                 sorts,

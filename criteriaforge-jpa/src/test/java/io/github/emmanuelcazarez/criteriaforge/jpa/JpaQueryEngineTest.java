@@ -7,7 +7,7 @@ import io.github.emmanuelcazarez.criteriaforge.core.Filters;
 import io.github.emmanuelcazarez.criteriaforge.core.PageSpec;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
-import io.github.emmanuelcazarez.criteriaforge.core.QuerySpec;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
 import io.github.emmanuelcazarez.criteriaforge.core.SortSpec;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.CustomerEntity;
@@ -25,12 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 @SpringJUnitConfig(JpaTestApplication.class)
 @Transactional
-class DefaultCriteriaForgeExecutorTest {
+class JpaQueryEngineTest {
 
     @Autowired
     private EntityManager entityManager;
 
-    private CriteriaForgeExecutor executor;
+    private JpaQueryEngine executor;
 
     @BeforeEach
     void setUp() {
@@ -49,12 +49,12 @@ class DefaultCriteriaForgeExecutorTest {
             .maxPageSize(10)
             .relationshipTraversal(true)
             .build();
-        executor = new DefaultCriteriaForgeExecutor(entityManager, ignored -> policy);
+        executor = new JpaQueryEngine(entityManager, ignored -> policy);
     }
 
     @Test
     void appliesDeclaredSortsAndOffsetPaginationWhileCountingAllMatches() {
-        var query = QuerySpec.builder()
+        var query = QueryRequest.builder()
             .sort(SortSpec.desc("total"), SortSpec.asc("reference"))
             .page(PageSpec.offset(1, 2))
             .build();
@@ -72,7 +72,7 @@ class DefaultCriteriaForgeExecutorTest {
     void defaultsToTheActualJpaIdentifierEvenWhenItIsNotNamedId() {
         var result = executor.findAll(
             OrderEntity.class,
-            QuerySpec.builder().page(PageSpec.offset(0, 10)).build());
+            QueryRequest.builder().page(PageSpec.offset(0, 10)).build());
 
         assertThat(result.content()).extracting(OrderEntity::getReference)
             .containsExactly("FIRST", "SECOND", "THIRD", "FOURTH");
@@ -95,7 +95,7 @@ class DefaultCriteriaForgeExecutorTest {
         entityManager.flush();
         entityManager.clear();
 
-        var query = QuerySpec.builder()
+        var query = QueryRequest.builder()
             .where(Filters.eq("items.product.name", "Widget"))
             .page(PageSpec.offset(0, 10))
             .build();
@@ -108,8 +108,8 @@ class DefaultCriteriaForgeExecutorTest {
     }
 
     @Test
-    void rejectsProjectionFieldsUntilTheProjectionApiIsUsed() {
-        var query = QuerySpec.builder().select("reference").build();
+    void entityExecutionRejectsProjectionFields() {
+        var query = QueryRequest.builder().select("reference").build();
 
         assertThatThrownBy(() -> executor.findAll(OrderEntity.class, query))
             .isInstanceOfSatisfying(QueryValidationException.class, error ->

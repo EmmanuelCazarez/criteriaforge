@@ -5,7 +5,7 @@ import java.util.Objects;
 /** Enforces transport-neutral query complexity limits before query execution. */
 public final class QueryComplexityValidator {
 
-    public void validate(QuerySpec query, QueryPolicy policy) {
+    public void validate(QueryRequest query, QueryPolicy policy) {
         Objects.requireNonNull(query, "query must not be null");
         Objects.requireNonNull(policy, "policy must not be null");
 

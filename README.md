@@ -1,6 +1,6 @@
 # CriteriaForge
 
-CriteriaForge turns an immutable query specification into validated Jakarta Persistence Criteria queries. It gives Spring applications rich filters, projections, sorting, and offset pagination without adding repository methods for every combination—and without putting REST or business logic in the query engine.
+CriteriaForge turns an immutable query request into validated Jakarta Persistence Criteria queries. It gives Spring applications rich filters, projections, sorting, and offset pagination without adding repository methods for every combination—and without putting REST or business logic in the query engine.
 
 CriteriaForge is a query library, not an API architecture or generic CRUD framework. Your application still owns authorization, use cases, domain rules, controllers, and response contracts.
 
@@ -30,7 +30,7 @@ implementation "io.github.emmanuelcazarez:criteriaforge-spring-boot-starter:0.1.
 implementation "io.github.emmanuelcazarez:criteriaforge-spring-web:0.1.0"
 ```
 
-The web module is deliberately separate. Omit it when another transport creates `QuerySpec` directly.
+The web module is deliberately separate. Omit it when another transport creates `QueryRequest` directly.
 
 ## One controller, many queries
 
@@ -38,17 +38,15 @@ The web module is deliberately separate. Omit it when another transport creates 
 @RestController
 @RequestMapping("/api/orders")
 class OrderQueryController {
-    private final CriteriaForgeExecutor executor;
+    private final QueryEngine queryEngine;
 
-    OrderQueryController(CriteriaForgeExecutor executor) {
-        this.executor = executor;
+    OrderQueryController(QueryEngine queryEngine) {
+        this.queryEngine = queryEngine;
     }
 
     @GetMapping
-    QueryResult<?> findAll(@CriteriaQuery QuerySpec query) {
-        return query.fields().isEmpty()
-            ? executor.findAll(Order.class, query)
-            : executor.findProjected(Order.class, query);
+    QueryResult<?> findAll(@DynamicQuery QueryRequest query) {
+        return queryEngine.execute(Order.class, query);
     }
 }
 ```
@@ -94,9 +92,9 @@ CI verifies Java 17 against Spring Boot 3.5.16 and 4.1.0, plus H2 and PostgreSQL
 
 | Module | Purpose |
 | --- | --- |
-| `criteriaforge-core` | Immutable query AST, policies, limits, results, and errors; pure Java |
+| `criteriaforge-core` | Query requests, filters, policies, results, and errors; pure Java |
 | `criteriaforge-jpa` | Typed JPA Criteria execution, joins, projections, counts, and pagination |
-| `criteriaforge-spring-web` | Optional URL parser and `@CriteriaQuery` argument resolver |
+| `criteriaforge-spring-web` | Optional URL parser and `@DynamicQuery` argument resolver |
 | `criteriaforge-spring-boot-autoconfigure` | Conditional beans and configuration properties |
 | `criteriaforge-spring-boot-starter` | Normal JPA consumer dependency; does not force a web stack |
 | `criteriaforge-example` | Unpublished runnable H2 application |
