@@ -130,7 +130,7 @@ public final class DefaultQueryParameterParser implements QueryParameterParser {
         try {
             return switch (operator) {
                 case IS_NULL, IS_NOT_NULL -> nullCondition(field, operator, values);
-                default -> Filters.condition(field, operator, values.toArray(String[]::new));
+                default -> Filters.condition(field, operator, values.toArray(Object[]::new));
             };
         } catch (IllegalArgumentException exception) {
             throw malformed("Malformed filter", field, exception);
