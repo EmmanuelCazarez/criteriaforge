@@ -17,6 +17,11 @@ All notable changes to CriteriaForge are documented here. The format follows [Ke
 - Stable per-entity public field mappings and per-request projection output aliases.
 - Explicit fail-closed per-entity policy registrations.
 
+### Fixed
+
+- PostgreSQL distinct projections over to-many joins now include hidden sort
+  selections without leaking them into the returned projection map.
+
 ## [0.1.0] - Unreleased
 
 First public release candidate.

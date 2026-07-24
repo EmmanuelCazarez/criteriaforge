@@ -108,6 +108,40 @@ class JpaQueryEngineTest {
     }
 
     @Test
+    void keepsSortSelectionsHiddenForDistinctPluralProjections() {
+        var widget = new ProductEntity("Projected Widget");
+        entityManager.persist(widget);
+        var firstItem = new OrderItemEntity(widget);
+        var secondItem = new OrderItemEntity(widget);
+        entityManager.persist(firstItem);
+        entityManager.persist(secondItem);
+        var customer = new CustomerEntity("Diana", "MX");
+        entityManager.persist(customer);
+        var duplicatedByJoin = order("PROJECTED-WITH-TWO-ITEMS", "120.00", customer);
+        duplicatedByJoin.addItem(firstItem);
+        duplicatedByJoin.addItem(secondItem);
+        entityManager.persist(duplicatedByJoin);
+        entityManager.flush();
+        entityManager.clear();
+
+        var query = QueryRequest.builder()
+            .select("reference", "total")
+            .where(Filters.field("items.product.name").eq("Projected Widget"))
+            .sort(SortSpec.desc("total"))
+            .page(PageSpec.offset(0, 10))
+            .build();
+
+        var result = executor.findProjected(OrderEntity.class, query);
+
+        assertThat(result.content()).singleElement().satisfies(row -> {
+            assertThat(row.keySet()).containsExactly("reference", "total");
+            assertThat(row.get("reference")).isEqualTo("PROJECTED-WITH-TWO-ITEMS");
+            assertThat((BigDecimal) row.get("total")).isEqualByComparingTo("120.00");
+        });
+        assertThat(result.total()).isEqualTo(1);
+    }
+
+    @Test
     void entityExecutionRejectsProjectionFields() {
         var query = QueryRequest.builder().select("reference").build();
 

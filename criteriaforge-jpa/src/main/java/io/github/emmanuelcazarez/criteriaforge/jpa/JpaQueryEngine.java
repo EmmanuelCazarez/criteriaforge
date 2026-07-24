@@ -11,10 +11,16 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
 import jakarta.persistence.criteria.From;
 import jakarta.persistence.criteria.Join;
+import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Selection;
 import jakarta.persistence.metamodel.PluralAttribute;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /** Default Criteria API implementation of {@link QueryEngine}. */
@@ -107,32 +113,58 @@ public final class JpaQueryEngine implements QueryEngine {
         var contentQuery = criteriaBuilder.createTupleQuery();
         var contentRoot = contentQuery.from(entityType);
         var contentJoins = new JoinRegistry(contentRoot);
-        contentQuery.multiselect(selectionBuilder.build(
+        var selections = new ArrayList<Selection<?>>(selectionBuilder.build(
             query.fields(), contentRoot, policy, contentJoins));
         query.filter().ifPresent(expression -> contentQuery.where(predicateBuilder.build(
             expression, contentRoot, criteriaBuilder, policy, contentJoins)));
-        if (query.sorts().isEmpty()) {
-            contentQuery.orderBy(criteriaBuilder.asc(contentRoot.get(identifierName(entityType))));
-        } else {
-            contentQuery.orderBy(sortBuilder.build(
-                query.sorts(), contentRoot, criteriaBuilder, policy, contentJoins));
+        List<Order> orders = query.sorts().isEmpty()
+            ? List.of(criteriaBuilder.asc(contentRoot.get(identifierName(entityType))))
+            : sortBuilder.build(
+                query.sorts(), contentRoot, criteriaBuilder, policy, contentJoins);
+        var distinct = hasPluralJoin(contentRoot);
+        if (distinct) {
+            var selectedSources = query.fields().stream()
+                .map(field -> policy.resolveField(field.source()))
+                .collect(Collectors.toUnmodifiableSet());
+            var sortSources = query.sorts().isEmpty()
+                ? List.of(identifierName(entityType))
+                : query.sorts().stream()
+                    .map(sort -> policy.resolveField(sort.field()))
+                    .toList();
+            addHiddenSortSelections(
+                selections, orders, sortSources, selectedSources);
         }
-        contentQuery.distinct(hasPluralJoin(contentRoot));
+        contentQuery.multiselect(selections);
+        contentQuery.orderBy(orders);
+        contentQuery.distinct(distinct);
 
         var content = entityManager.createQuery(contentQuery)
             .setFirstResult(page.offset())
             .setMaxResults(page.limit())
             .getResultList().stream()
-            .map(tuple -> mapAssembler.assemble(query.fields(), tupleValues(tuple)))
+            .map(tuple -> mapAssembler.assemble(
+                query.fields(), tupleValues(tuple, query.fields().size())))
             .toList();
         var total = count(entityType, query, policy);
         return new QueryResult<>(content, total, page.offset(), page.limit());
     }
 
-    private static java.util.List<?> tupleValues(Tuple tuple) {
-        return IntStream.range(0, tuple.getElements().size())
+    private static java.util.List<?> tupleValues(Tuple tuple, int visibleSelections) {
+        return IntStream.range(0, visibleSelections)
             .mapToObj(tuple::get)
             .toList();
+    }
+
+    private static void addHiddenSortSelections(
+            List<Selection<?>> selections,
+            List<Order> orders,
+            List<String> sortSources,
+            Set<String> selectedSources) {
+        for (int index = 0; index < orders.size(); index++) {
+            if (!selectedSources.contains(sortSources.get(index))) {
+                selections.add(orders.get(index).getExpression());
+            }
+        }
     }
 
     private <T> long count(Class<T> entityType, QueryRequest query, QueryPolicy policy) {
