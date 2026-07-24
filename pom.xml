@@ -52,7 +52,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <spring-boot.version>3.5.16</spring-boot.version>
         <spring-boot4.version>4.1.0</spring-boot4.version>
-        <archunit.version>1.4.1</archunit.version>
+        <archunit.version>1.4.2</archunit.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
         <jacoco.version>0.8.14</jacoco.version>
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
