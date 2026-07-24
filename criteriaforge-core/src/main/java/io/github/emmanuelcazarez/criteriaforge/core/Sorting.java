@@ -8,9 +8,6 @@ public record Sorting(List<Order> orders) {
 
     public Sorting {
         Objects.requireNonNull(orders, "orders must not be null");
-        if (orders.isEmpty()) {
-            throw new IllegalArgumentException("orders must not be empty");
-        }
         if (orders.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException("orders must not contain null");
         }

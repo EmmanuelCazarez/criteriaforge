@@ -31,8 +31,8 @@ final class JpaQueryPolicyValidator {
 
         query.filter().ifPresent(expression -> validateFilter(entityType, expression, policy));
         query.fields().forEach(field -> validateProjection(entityType, field.source(), policy));
-        query.sorting().ifPresent(sorting -> sorting.orders()
-            .forEach(order -> validateSort(entityType, order.field(), policy)));
+        query.sorting().orders()
+            .forEach(order -> validateSort(entityType, order.field(), policy));
     }
 
     private void validateFilter(

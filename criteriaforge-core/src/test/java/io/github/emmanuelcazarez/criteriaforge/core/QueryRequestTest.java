@@ -32,11 +32,10 @@ class QueryRequestTest {
             ProjectionField.of("customer.name"));
         assertThat(query.pagination()).contains(new Pagination(5, 20));
         assertThat(query.filter()).containsInstanceOf(FilterGroup.class);
-        assertThat(query.sorting()).hasValueSatisfying(sorting ->
-            assertThat(sorting.orders()).containsExactly(
-                new Sorting.Order("createdAt", SortDirection.DESC),
-                new Sorting.Order("id", SortDirection.ASC)));
-        assertThat(query.sorting().orElseThrow().orders())
+        assertThat(query.sorting().orders()).containsExactly(
+            new Sorting.Order("createdAt", SortDirection.DESC),
+            new Sorting.Order("id", SortDirection.ASC));
+        assertThat(query.sorting().orders())
             .isUnmodifiable();
         assertThatThrownBy(() -> query.fields().add(ProjectionField.of("other")))
             .isInstanceOf(UnsupportedOperationException.class);
@@ -67,6 +66,15 @@ class QueryRequestTest {
         assertThatIllegalStateException().isThrownBy(
             () -> QueryRequest.builder().offset(10).build())
             .withMessage("limit must be configured when offset is configured");
+    }
+
+    @Test
+    void representsMissingOrderByAsEmptySorting() {
+        var emptySorting = new Sorting(List.of());
+        var query = QueryRequest.builder().build();
+
+        assertThat(emptySorting.orders()).isEmpty();
+        assertThat(query.sorting()).isEqualTo(emptySorting);
     }
 
     @Test

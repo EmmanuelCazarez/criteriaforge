@@ -52,7 +52,7 @@ class DynamicQueryArgumentResolverTest {
         @GetMapping("/orders")
         String orders(@DynamicQuery QueryRequest query) {
             return query.fields().stream().map(ProjectionField::output).toList()
-                + "|" + query.sorting().orElseThrow().orders() + "|"
+                + "|" + query.sorting().orders() + "|"
                 + query.pagination().orElseThrow().limit();
         }
     }

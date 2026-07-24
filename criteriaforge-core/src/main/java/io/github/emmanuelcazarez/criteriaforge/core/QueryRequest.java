@@ -12,7 +12,7 @@ import java.util.Optional;
 public record QueryRequest(
         List<ProjectionField> fields,
         Optional<FilterExpression> filter,
-        Optional<Sorting> sorting,
+        Sorting sorting,
         Optional<Pagination> pagination) {
 
     public QueryRequest {
@@ -118,9 +118,7 @@ public record QueryRequest(
             return new QueryRequest(
                 fields,
                 Optional.ofNullable(filter),
-                orders.isEmpty()
-                    ? Optional.empty()
-                    : Optional.of(new Sorting(orders)),
+                new Sorting(orders),
                 pagination());
         }
 

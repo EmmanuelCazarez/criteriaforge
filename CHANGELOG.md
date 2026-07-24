@@ -22,6 +22,8 @@ All notable changes to CriteriaForge are documented here. The format follows [Ke
 
 - PostgreSQL distinct projections over to-many joins now include hidden sort
   selections without leaking them into the returned projection map.
+- Empty sorting now represents a valid query without explicit ordering instead
+  of raising an exception.
 
 ## [0.1.0] - Unreleased
 

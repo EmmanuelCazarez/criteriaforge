@@ -68,7 +68,7 @@ public final class JpaQueryEngine implements QueryEngine {
         complexityValidator.validate(query, policy);
         policyValidator.validate(entityType, query, policy);
         var pagination = query.pagination().orElse(new Pagination(0, policy.maxPageSize()));
-        var sortOrders = query.sorting().map(sorting -> sorting.orders()).orElseGet(List::of);
+        var sortOrders = query.sorting().orders();
 
         var criteriaBuilder = entityManager.getCriteriaBuilder();
         var contentQuery = criteriaBuilder.createQuery(entityType);
@@ -110,7 +110,7 @@ public final class JpaQueryEngine implements QueryEngine {
         complexityValidator.validate(query, policy);
         policyValidator.validate(entityType, query, policy);
         var pagination = query.pagination().orElse(new Pagination(0, policy.maxPageSize()));
-        var sortOrders = query.sorting().map(sorting -> sorting.orders()).orElseGet(List::of);
+        var sortOrders = query.sorting().orders();
 
         var criteriaBuilder = entityManager.getCriteriaBuilder();
         var contentQuery = criteriaBuilder.createTupleQuery();
