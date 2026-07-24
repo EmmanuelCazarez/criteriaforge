@@ -3,12 +3,10 @@ package io.github.emmanuelcazarez.criteriaforge.jpa;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.github.emmanuelcazarez.criteriaforge.core.PageSpec;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
-import io.github.emmanuelcazarez.criteriaforge.core.SortSpec;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.CustomerEntity;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.OrderEntity;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.OrderStatus;
@@ -50,8 +48,8 @@ class JpaProjectionTest {
     void selectsOrderedRootAndNestedFieldsAndSortsByAnUnselectedField() {
         var query = QueryRequest.builder()
             .select("reference", "customer.name", "customer.country")
-            .sort(SortSpec.desc("total"))
-            .page(PageSpec.offset(0, 2))
+            .orderByDescending("total")
+            .limit(2)
             .build();
 
         var result = executor.findProjected(OrderEntity.class, query);

@@ -9,7 +9,7 @@ public final class QueryComplexityValidator {
         Objects.requireNonNull(query, "query must not be null");
         Objects.requireNonNull(policy, "policy must not be null");
 
-        query.page().ifPresent(page -> validatePage(page, policy));
+        query.pagination().ifPresent(pagination -> validatePagination(pagination, policy));
         var conditions = query.filter().map(this::countConditions).orElse(0);
         if (conditions > policy.maxConditions()) {
             throw new QueryValidationException(
@@ -19,11 +19,11 @@ public final class QueryComplexityValidator {
         }
     }
 
-    private static void validatePage(PageSpec page, QueryPolicy policy) {
-        if (page.limit() > policy.maxPageSize()) {
+    private static void validatePagination(Pagination pagination, QueryPolicy policy) {
+        if (pagination.limit() > policy.maxPageSize()) {
             throw new QueryValidationException(
                 QueryErrorCode.PAGE_SIZE_EXCEEDED,
-                "Requested limit " + page.limit() + " exceeds maximum "
+                "Requested limit " + pagination.limit() + " exceeds maximum "
                     + policy.maxPageSize(),
                 "limit");
         }

@@ -3,11 +3,11 @@ package io.github.emmanuelcazarez.criteriaforge.web;
 import io.github.emmanuelcazarez.criteriaforge.core.FilterExpression;
 import io.github.emmanuelcazarez.criteriaforge.core.Filters;
 import io.github.emmanuelcazarez.criteriaforge.core.Operator;
-import io.github.emmanuelcazarez.criteriaforge.core.PageSpec;
+import io.github.emmanuelcazarez.criteriaforge.core.Pagination;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
-import io.github.emmanuelcazarez.criteriaforge.core.SortSpec;
+import io.github.emmanuelcazarez.criteriaforge.core.SortDirection;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -69,14 +69,15 @@ public final class DefaultQueryParameterParser implements QueryParameterParser {
 
         var builder = QueryRequest.builder();
         splitValues(parameters.get("fields")).forEach(field -> select(builder, field));
-        splitValues(parameters.get("sort")).forEach(token -> builder.sort(parseSort(token)));
+        splitValues(parameters.get("sort")).forEach(token -> addSorting(builder, token));
         if (readableFilter != null) {
             builder.where(new FilterExpressionParser(
                 readableFilter, maxExpressionDepth).parse());
         } else {
             combine(normalFilters, alternativeFilters).ifPresent(builder::where);
         }
-        parsePage(parameters).ifPresent(builder::page);
+        parsePagination(parameters).ifPresent(pagination ->
+            builder.offset(pagination.offset()).limit(pagination.limit()));
         try {
             return builder.build();
         } catch (IllegalArgumentException exception) {
@@ -168,17 +169,19 @@ public final class DefaultQueryParameterParser implements QueryParameterParser {
             : Filters.allOf(expressions);
     }
 
-    private static SortSpec parseSort(String token) {
+    private static void addSorting(QueryRequest.Builder builder, String token) {
         if (token.startsWith("-")) {
-            return SortSpec.desc(token.substring(1));
+            builder.orderBy(token.substring(1), SortDirection.DESC);
+            return;
         }
         if (token.startsWith("+")) {
-            return SortSpec.asc(token.substring(1));
+            builder.orderBy(token.substring(1), SortDirection.ASC);
+            return;
         }
-        return SortSpec.asc(token);
+        builder.orderBy(token, SortDirection.ASC);
     }
 
-    private static java.util.Optional<PageSpec> parsePage(
+    private static java.util.Optional<Pagination> parsePagination(
             MultiValueMap<String, String> parameters) {
         var limits = parameters.get("limit");
         var offsets = parameters.get("offset");
@@ -191,7 +194,7 @@ public final class DefaultQueryParameterParser implements QueryParameterParser {
         var limit = oneInteger(limits, "limit");
         var offset = offsets == null ? 0 : oneInteger(offsets, "offset");
         try {
-            return java.util.Optional.of(PageSpec.offset(offset, limit));
+            return java.util.Optional.of(new Pagination(offset, limit));
         } catch (IllegalArgumentException exception) {
             throw malformed("Malformed pagination", "limit", exception);
         }

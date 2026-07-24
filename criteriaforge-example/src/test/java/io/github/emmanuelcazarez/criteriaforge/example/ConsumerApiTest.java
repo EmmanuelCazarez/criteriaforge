@@ -34,6 +34,17 @@ class ConsumerApiTest {
             .isEmpty();
         assertThat(load("io.github.emmanuelcazarez.criteriaforge.web.annotation.CriteriaQuery"))
             .isEmpty();
+        assertThat(load("io.github.emmanuelcazarez.criteriaforge.core.Sorting")).isPresent();
+        assertThat(load("io.github.emmanuelcazarez.criteriaforge.core.Pagination")).isPresent();
+        assertThat(load(coreType("Sort", "Spec"))).isEmpty();
+        assertThat(load(coreType("Page", "Spec"))).isEmpty();
+
+        var builderType = load(
+            "io.github.emmanuelcazarez.criteriaforge.core.QueryRequest$Builder").orElseThrow();
+        assertThat(builderType.getMethod("orderByAscending", String.class)).isNotNull();
+        assertThat(builderType.getMethod("orderByDescending", String.class)).isNotNull();
+        assertThat(builderType.getMethod("offset", int.class)).isNotNull();
+        assertThat(builderType.getMethod("limit", int.class)).isNotNull();
     }
 
     @Test
@@ -83,5 +94,9 @@ class ConsumerApiTest {
         } catch (ClassNotFoundException exception) {
             return Optional.empty();
         }
+    }
+
+    private static String coreType(String... nameParts) {
+        return "io.github.emmanuelcazarez.criteriaforge.core." + String.join("", nameParts);
     }
 }

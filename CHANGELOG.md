@@ -16,6 +16,7 @@ All notable changes to CriteriaForge are documented here. The format follows [Ke
 - Readable HTTP filter expressions with boolean precedence and bounded parsing.
 - Stable per-entity public field mappings and per-request projection output aliases.
 - Explicit fail-closed per-entity policy registrations.
+- Fluent `Sorting` and `Pagination` query components with import-free builder methods.
 
 ### Fixed
 

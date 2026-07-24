@@ -1,6 +1,6 @@
 package io.github.emmanuelcazarez.criteriaforge.jpa;
 
-import io.github.emmanuelcazarez.criteriaforge.core.PageSpec;
+import io.github.emmanuelcazarez.criteriaforge.core.Pagination;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryComplexityValidator;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
@@ -67,7 +67,8 @@ public final class JpaQueryEngine implements QueryEngine {
             policyProvider.policyFor(entityType), "provided query policy must not be null");
         complexityValidator.validate(query, policy);
         policyValidator.validate(entityType, query, policy);
-        var page = query.page().orElse(PageSpec.offset(0, policy.maxPageSize()));
+        var pagination = query.pagination().orElse(new Pagination(0, policy.maxPageSize()));
+        var sortOrders = query.sorting().map(sorting -> sorting.orders()).orElseGet(List::of);
 
         var criteriaBuilder = entityManager.getCriteriaBuilder();
         var contentQuery = criteriaBuilder.createQuery(entityType);
@@ -77,20 +78,21 @@ public final class JpaQueryEngine implements QueryEngine {
         query.filter().ifPresent(expression -> contentQuery.where(predicateBuilder.build(
             expression, contentRoot, criteriaBuilder, policy, contentJoins)));
 
-        if (query.sorts().isEmpty()) {
+        if (sortOrders.isEmpty()) {
             contentQuery.orderBy(criteriaBuilder.asc(contentRoot.get(identifierName(entityType))));
         } else {
             contentQuery.orderBy(sortBuilder.build(
-                query.sorts(), contentRoot, criteriaBuilder, policy, contentJoins));
+                sortOrders, contentRoot, criteriaBuilder, policy, contentJoins));
         }
         contentQuery.distinct(hasPluralJoin(contentRoot));
 
         var content = entityManager.createQuery(contentQuery)
-            .setFirstResult(page.offset())
-            .setMaxResults(page.limit())
+            .setFirstResult(pagination.offset())
+            .setMaxResults(pagination.limit())
             .getResultList();
         var total = count(entityType, query, policy);
-        return new QueryResult<>(content, total, page.offset(), page.limit());
+        return new QueryResult<>(
+            content, total, pagination.offset(), pagination.limit());
     }
 
     QueryResult<Map<String, Object>> findProjected(
@@ -107,7 +109,8 @@ public final class JpaQueryEngine implements QueryEngine {
             policyProvider.policyFor(entityType), "provided query policy must not be null");
         complexityValidator.validate(query, policy);
         policyValidator.validate(entityType, query, policy);
-        var page = query.page().orElse(PageSpec.offset(0, policy.maxPageSize()));
+        var pagination = query.pagination().orElse(new Pagination(0, policy.maxPageSize()));
+        var sortOrders = query.sorting().map(sorting -> sorting.orders()).orElseGet(List::of);
 
         var criteriaBuilder = entityManager.getCriteriaBuilder();
         var contentQuery = criteriaBuilder.createTupleQuery();
@@ -117,18 +120,18 @@ public final class JpaQueryEngine implements QueryEngine {
             query.fields(), contentRoot, policy, contentJoins));
         query.filter().ifPresent(expression -> contentQuery.where(predicateBuilder.build(
             expression, contentRoot, criteriaBuilder, policy, contentJoins)));
-        List<Order> orders = query.sorts().isEmpty()
+        List<Order> orders = sortOrders.isEmpty()
             ? List.of(criteriaBuilder.asc(contentRoot.get(identifierName(entityType))))
             : sortBuilder.build(
-                query.sorts(), contentRoot, criteriaBuilder, policy, contentJoins);
+                sortOrders, contentRoot, criteriaBuilder, policy, contentJoins);
         var distinct = hasPluralJoin(contentRoot);
         if (distinct) {
             var selectedSources = query.fields().stream()
                 .map(field -> policy.resolveField(field.source()))
                 .collect(Collectors.toUnmodifiableSet());
-            var sortSources = query.sorts().isEmpty()
+            var sortSources = sortOrders.isEmpty()
                 ? List.of(identifierName(entityType))
-                : query.sorts().stream()
+                : sortOrders.stream()
                     .map(sort -> policy.resolveField(sort.field()))
                     .toList();
             addHiddenSortSelections(
@@ -139,14 +142,15 @@ public final class JpaQueryEngine implements QueryEngine {
         contentQuery.distinct(distinct);
 
         var content = entityManager.createQuery(contentQuery)
-            .setFirstResult(page.offset())
-            .setMaxResults(page.limit())
+            .setFirstResult(pagination.offset())
+            .setMaxResults(pagination.limit())
             .getResultList().stream()
             .map(tuple -> mapAssembler.assemble(
                 query.fields(), tupleValues(tuple, query.fields().size())))
             .toList();
         var total = count(entityType, query, policy);
-        return new QueryResult<>(content, total, page.offset(), page.limit());
+        return new QueryResult<>(
+            content, total, pagination.offset(), pagination.limit());
     }
 
     private static java.util.List<?> tupleValues(Tuple tuple, int visibleSelections) {

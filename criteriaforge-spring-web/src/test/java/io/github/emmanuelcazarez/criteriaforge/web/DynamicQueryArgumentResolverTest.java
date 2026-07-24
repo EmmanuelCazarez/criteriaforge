@@ -36,7 +36,8 @@ class DynamicQueryArgumentResolverTest {
                 .queryParam("sort", "-total")
                 .queryParam("limit", "20"))
             .andExpect(status().isOk())
-            .andExpect(content().string("[reference, total]|[SortSpec[field=total, direction=DESC]]|20"));
+            .andExpect(content().string(
+                "[reference, total]|[Order[field=total, direction=DESC]]|20"));
     }
 
     @Test
@@ -51,8 +52,8 @@ class DynamicQueryArgumentResolverTest {
         @GetMapping("/orders")
         String orders(@DynamicQuery QueryRequest query) {
             return query.fields().stream().map(ProjectionField::output).toList()
-                + "|" + query.sorts() + "|"
-                + query.page().orElseThrow().limit();
+                + "|" + query.sorting().orElseThrow().orders() + "|"
+                + query.pagination().orElseThrow().limit();
         }
     }
 }

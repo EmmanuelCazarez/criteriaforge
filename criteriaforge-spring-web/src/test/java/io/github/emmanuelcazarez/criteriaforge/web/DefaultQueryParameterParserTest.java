@@ -4,12 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.emmanuelcazarez.criteriaforge.core.Filters;
-import io.github.emmanuelcazarez.criteriaforge.core.PageSpec;
 import io.github.emmanuelcazarez.criteriaforge.core.ProjectionField;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
-import io.github.emmanuelcazarez.criteriaforge.core.SortSpec;
 import org.junit.jupiter.api.Test;
 import org.springframework.util.LinkedMultiValueMap;
 
@@ -35,8 +33,10 @@ class DefaultQueryParameterParserTest {
             .where(Filters.field("status").eq("PAID")
                 .and(Filters.field("total").gte("100.00"))
                 .and(Filters.field("reference").like("WEB-%")))
-            .sort(SortSpec.desc("total"), SortSpec.asc("reference"))
-            .page(PageSpec.offset(10, 20))
+            .orderByDescending("total")
+            .orderByAscending("reference")
+            .offset(10)
+            .limit(20)
             .build();
         assertThat(parsed).isEqualTo(expected);
     }

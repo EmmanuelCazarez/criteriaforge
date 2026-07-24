@@ -4,7 +4,7 @@ import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
 import io.github.emmanuelcazarez.criteriaforge.core.SortDirection;
-import io.github.emmanuelcazarez.criteriaforge.core.SortSpec;
+import io.github.emmanuelcazarez.criteriaforge.core.Sorting;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Root;
@@ -20,7 +20,7 @@ final class JpaSortBuilder {
     }
 
     List<Order> build(
-            List<SortSpec> sorts,
+            List<Sorting.Order> sorts,
             Root<?> root,
             CriteriaBuilder criteriaBuilder,
             QueryPolicy policy,
@@ -31,7 +31,7 @@ final class JpaSortBuilder {
     }
 
     private Order build(
-            SortSpec sort,
+            Sorting.Order sort,
             Root<?> root,
             CriteriaBuilder criteriaBuilder,
             QueryPolicy policy,
@@ -64,7 +64,7 @@ final class JpaSortBuilder {
     }
 
     private static QueryValidationException rejected(
-            QueryErrorCode code, String message, SortSpec sort) {
+            QueryErrorCode code, String message, Sorting.Order sort) {
         return new QueryValidationException(code, message, sort.field());
     }
 }
