@@ -96,7 +96,7 @@ class JpaQueryEngineTest {
         entityManager.clear();
 
         var query = QueryRequest.builder()
-            .where(Filters.eq("items.product.name", "Widget"))
+            .where(Filters.field("items.product.name").eq("Widget"))
             .page(PageSpec.offset(0, 10))
             .build();
 
@@ -114,6 +114,52 @@ class JpaQueryEngineTest {
         assertThatThrownBy(() -> executor.findAll(OrderEntity.class, query))
             .isInstanceOfSatisfying(QueryValidationException.class, error ->
                 assertThat(error.code()).isEqualTo(QueryErrorCode.UNSUPPORTED_PROJECTION));
+    }
+
+    @Test
+    void projectsSelectedSourcesIntoPerRequestOutputPathsInRequestOrder() {
+        var query = QueryRequest.builder()
+            .selectAs("customer.name", "buyer.name")
+            .selectAs("total", "orderTotal")
+            .sort(SortSpec.asc("reference"))
+            .page(PageSpec.offset(0, 1))
+            .build();
+
+        var result = executor.findProjected(OrderEntity.class, query);
+
+        assertThat(result.content()).singleElement().satisfies(row -> {
+            assertThat(row.keySet()).containsExactly("buyer", "orderTotal");
+            assertThat(row.get("buyer")).isEqualTo(java.util.Map.of("name", "Ana"));
+            assertThat((BigDecimal) row.get("orderTotal"))
+                .isEqualByComparingTo(new BigDecimal("20.00"));
+        });
+    }
+
+    @Test
+    void resolvesStablePublicFieldNamesForFiltersSortsAndProjections() {
+        var publicPolicy = QueryPolicy.builder()
+            .allowFields("reference")
+            .alias("amount", "total")
+            .alias("buyerName", "customer.name")
+            .relationshipTraversal(true)
+            .build();
+        var publicExecutor = new JpaQueryEngine(entityManager, ignored -> publicPolicy);
+        var query = QueryRequest.builder()
+            .selectAs("buyerName", "buyer.name")
+            .selectAs("amount", "orderTotal")
+            .where(Filters.field("amount").gte(new BigDecimal("40.00")))
+            .sort(SortSpec.desc("amount"))
+            .page(PageSpec.offset(0, 1))
+            .build();
+
+        var result = publicExecutor.findProjected(OrderEntity.class, query);
+
+        assertThat(result.content()).singleElement().satisfies(row -> {
+            assertThat(row.get("buyer")).isEqualTo(java.util.Map.of("name", "Bob"));
+            assertThat((BigDecimal) row.get("orderTotal"))
+                .isEqualByComparingTo("80.00");
+        });
+        assertThat(result.total()).isEqualTo(3);
     }
 
     private static OrderEntity order(

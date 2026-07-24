@@ -1,12 +1,12 @@
 package io.github.emmanuelcazarez.criteriaforge.example;
 
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicyRegistration;
 import io.github.emmanuelcazarez.criteriaforge.example.domain.Customer;
 import io.github.emmanuelcazarez.criteriaforge.example.domain.CustomerRepository;
 import io.github.emmanuelcazarez.criteriaforge.example.domain.Order;
 import io.github.emmanuelcazarez.criteriaforge.example.domain.OrderRepository;
 import io.github.emmanuelcazarez.criteriaforge.example.domain.OrderStatus;
-import io.github.emmanuelcazarez.criteriaforge.jpa.QueryPolicyProvider;
 import java.math.BigDecimal;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
@@ -16,12 +16,14 @@ import org.springframework.context.annotation.Configuration;
 class ExampleConfiguration {
 
     @Bean
-    QueryPolicyProvider exampleQueryPolicy() {
+    QueryPolicyRegistration exampleOrderQueryPolicy() {
         var policy = QueryPolicy.builder()
             .relationshipTraversal(true)
             .maxPageSize(100)
+            .alias("amount", "total")
+            .alias("buyerName", "customer.name")
             .build();
-        return ignored -> policy;
+        return QueryPolicyRegistration.forEntity(Order.class, policy);
     }
 
     @Bean

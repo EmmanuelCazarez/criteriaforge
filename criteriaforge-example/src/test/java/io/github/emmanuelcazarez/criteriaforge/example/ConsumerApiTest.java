@@ -54,18 +54,26 @@ class ConsumerApiTest {
     }
 
     @Test
-    void exposesFiltersWithoutConcreteExpressionImplementations() {
+    void exposesFiltersWithoutConcreteExpressionImplementations() throws Exception {
         var expressionType = load(
             "io.github.emmanuelcazarez.criteriaforge.core.FilterExpression").orElseThrow();
         var filtersType = load("io.github.emmanuelcazarez.criteriaforge.core.Filters").orElseThrow();
+        var fieldType = load(
+            "io.github.emmanuelcazarez.criteriaforge.core.FilterField").orElseThrow();
 
         assertThat(List.of("Condition", "FilterGroup", "Negation"))
             .allSatisfy(typeName -> assertThat(load(
                     "io.github.emmanuelcazarez.criteriaforge.core." + typeName))
                 .hasValueSatisfying(type -> assertThat(Modifier.isPublic(type.getModifiers()))
                     .isFalse()));
+        assertThat(filtersType.getMethod("field", String.class).getReturnType())
+            .isEqualTo(fieldType);
         assertThat(Arrays.stream(filtersType.getMethods())
-                .filter(method -> method.getDeclaringClass().equals(filtersType)))
+                .filter(method -> method.getDeclaringClass().equals(filtersType))
+                .filter(method -> !method.getName().equals("field")))
+            .allSatisfy(method -> assertThat(method.getReturnType()).isEqualTo(expressionType));
+        assertThat(Arrays.stream(fieldType.getMethods())
+                .filter(method -> method.getDeclaringClass().equals(fieldType)))
             .allSatisfy(method -> assertThat(method.getReturnType()).isEqualTo(expressionType));
     }
 

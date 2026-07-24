@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
+import io.github.emmanuelcazarez.criteriaforge.core.ProjectionField;
 import io.github.emmanuelcazarez.criteriaforge.web.annotation.DynamicQuery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,7 +50,8 @@ class DynamicQueryArgumentResolverTest {
     static class QueryController {
         @GetMapping("/orders")
         String orders(@DynamicQuery QueryRequest query) {
-            return query.fields() + "|" + query.sorts() + "|"
+            return query.fields().stream().map(ProjectionField::output).toList()
+                + "|" + query.sorts() + "|"
                 + query.page().orElseThrow().limit();
         }
     }

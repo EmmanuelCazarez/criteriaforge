@@ -62,4 +62,20 @@ class OrderQueryApiTest {
             .andExpect(jsonPath("$.content[0].reference").value("ORD-100"))
             .andExpect(jsonPath("$.content[1].reference").value("ORD-101"));
     }
+
+    @Test
+    void exposesReadableFiltersStableFieldNamesAndResponseAliases() throws Exception {
+        mockMvc.perform(get("/api/orders")
+                .queryParam("filter", "status == PAID and amount >= 100")
+                .queryParam(
+                    "fields",
+                    "reference,buyerName as buyer.name,amount as orderTotal")
+                .queryParam("sort", "-amount")
+                .queryParam("limit", "20"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.total").value(2))
+            .andExpect(jsonPath("$.content[0].reference").value("ORD-102"))
+            .andExpect(jsonPath("$.content[0].buyer.name").value("Luis"))
+            .andExpect(jsonPath("$.content[0].orderTotal").value(250.00));
+    }
 }

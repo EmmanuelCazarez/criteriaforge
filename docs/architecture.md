@@ -16,19 +16,25 @@ Spring Boot auto-configuration wires the selected modules when they are present.
 
 ## Consumer API
 
-A normal application only needs five concepts:
+A normal application only needs these concepts:
 
 | Concept | Responsibility |
 |---|---|
 | `QueryRequest` | Describes selected fields, filters, sorting, and pagination |
 | `Filters` | Builds programmatic filter expressions when HTTP is not the input |
 | `QueryPolicy` | Limits the fields, operators, relationships, and complexity callers may use |
+| `QueryPolicyRegistration` | Binds one explicit policy to one exposed entity type |
 | `QueryEngine` | Validates and executes a request for a JPA entity |
 | `QueryResult` | Returns content, total count, offset, and limit |
 
 `QueryEngine.execute(...)` chooses entity or projected execution from the request. Controllers do not branch on projection details.
 
-`FilterExpression` is an opaque composition type. Application code creates expressions with `Filters.eq(...)`, `Filters.and(...)`, `Filters.or(...)`, and `Filters.not(...)`; the concrete expression nodes are internal to the core module. The visitor exposed by `FilterExpression` exists for persistence-adapter implementations, not normal application code.
+`FilterExpression` is an opaque composition type. Application code starts with
+`Filters.field("status").eq(status)` and combines expressions with fluent
+`and(...)`, `or(...)`, and `not()` calls. Dynamic collections use
+`Filters.allOf(...)` or `Filters.anyOf(...)`. The concrete expression nodes are
+internal to the core module; the visitor exposed by `FilterExpression` exists
+for persistence-adapter implementations, not normal application code.
 
 ## Module responsibilities
 
@@ -56,12 +62,12 @@ Business decisions, workflows, invariants, authorization, and orchestration rema
 
 ## Query execution
 
-The JPA module performs metadata-only preflight validation before creating executable queries. Content and count queries are built independently because Criteria roots and joins cannot be shared between them. Identifier ordering comes from the metamodel. To-many filtering enables distinct content and count behavior. Projection aliases retain complete paths and are assembled into insertion-ordered nested maps.
+The JPA module performs metadata-only preflight validation before creating executable queries. Content and count queries are built independently because Criteria roots and joins cannot be shared between them. Identifier ordering comes from the metamodel. To-many filtering enables distinct content and count behavior. Projection sources are resolved through stable policy field mappings; per-request output paths are assembled into insertion-ordered nested maps.
 
 ## Extension points
 
 - Create `QueryRequest` from another input mechanism without changing core or JPA.
-- Replace `QueryPolicyProvider` for endpoint- or entity-specific exposure.
+- Register one `QueryPolicyRegistration` bean per exposed entity.
 - Replace auto-configured beans with normal application beans.
 - Build another persistence integration from the core query model only when its operator semantics are explicit and separately tested.
 

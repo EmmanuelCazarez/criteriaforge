@@ -1,5 +1,6 @@
 package io.github.emmanuelcazarez.criteriaforge.jpa;
 
+import io.github.emmanuelcazarez.criteriaforge.core.ProjectionField;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -9,16 +10,16 @@ import java.util.Objects;
 /** Reconstructs ordered nested maps from flat Criteria tuple selections. */
 final class NestedMapAssembler {
 
-    public Map<String, Object> assemble(List<String> paths, List<?> values) {
-        Objects.requireNonNull(paths, "paths must not be null");
+    public Map<String, Object> assemble(List<ProjectionField> fields, List<?> values) {
+        Objects.requireNonNull(fields, "fields must not be null");
         Objects.requireNonNull(values, "values must not be null");
-        if (paths.size() != values.size()) {
-            throw new IllegalArgumentException("paths and values must have the same size");
+        if (fields.size() != values.size()) {
+            throw new IllegalArgumentException("fields and values must have the same size");
         }
 
         var root = new LinkedHashMap<String, Object>();
-        for (int index = 0; index < paths.size(); index++) {
-            insert(root, paths.get(index), values.get(index));
+        for (int index = 0; index < fields.size(); index++) {
+            insert(root, fields.get(index).output(), values.get(index));
         }
         return immutable(root);
     }

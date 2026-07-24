@@ -3,6 +3,7 @@ package io.github.emmanuelcazarez.criteriaforge.jpa;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
+import io.github.emmanuelcazarez.criteriaforge.core.ProjectionField;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Selection;
 import jakarta.persistence.metamodel.Metamodel;
@@ -21,15 +22,16 @@ final class JpaSelectionBuilder {
     }
 
     List<Selection<?>> build(
-            List<String> fields, Root<?> root, QueryPolicy policy, JoinRegistry joins) {
+            List<ProjectionField> fields, Root<?> root, QueryPolicy policy, JoinRegistry joins) {
         var selections = new ArrayList<Selection<?>>();
         fields.forEach(field -> selections.add(selection(field, root, policy, joins)));
         return List.copyOf(selections);
     }
 
     private Selection<?> selection(
-            String field, Root<?> root, QueryPolicy policy, JoinRegistry joins) {
-        var resolved = pathResolver.resolve(root, field, joins);
+            ProjectionField projection, Root<?> root, QueryPolicy policy, JoinRegistry joins) {
+        var field = projection.source();
+        var resolved = pathResolver.resolve(root, policy.resolveField(field), joins);
         if (!policy.isFieldAllowed(field)) {
             throw rejected(QueryErrorCode.FIELD_NOT_ALLOWED, "Projection field is not allowed", field);
         }
@@ -51,7 +53,7 @@ final class JpaSelectionBuilder {
                 "Only scalar root and to-one projection fields are supported",
                 field);
         }
-        return resolved.path().alias(field);
+        return resolved.path().alias(projection.output());
     }
 
     private boolean isManagedType(Class<?> type) {

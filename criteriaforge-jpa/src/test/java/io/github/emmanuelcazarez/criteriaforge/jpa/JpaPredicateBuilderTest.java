@@ -60,24 +60,22 @@ class JpaPredicateBuilderTest {
 
     @Test
     void preservesNestedBooleanPrecedence() {
-        var expression = Filters.and(
-            Filters.eq("status", "PAID"),
-            Filters.or(
-                Filters.lt("total", "10"),
-                Filters.gte("total", "100")));
+        var expression = Filters.field("status").eq(OrderStatus.PAID)
+            .and(Filters.field("total").lt(new BigDecimal("10"))
+                .or(Filters.field("total").gte(new BigDecimal("100"))));
 
         assertThat(execute(expression)).containsExactly("PAID-HIGH", "PAID-LOW");
     }
 
     @Test
     void supportsRelationshipPredicatesWhenPolicyAllowsTraversal() {
-        assertThat(execute(Filters.eq("customer.country", "MX")))
+        assertThat(execute(Filters.field("customer.country").eq("MX")))
             .containsExactly("PAID-HIGH", "PAID-LOW");
     }
 
     @Test
     void rejectsOperatorsThatDoNotMatchTheResolvedType() {
-        assertThatThrownBy(() -> execute(Filters.like("total", "15%")))
+        assertThatThrownBy(() -> execute(Filters.field("total").like("15%")))
             .isInstanceOfSatisfying(QueryValidationException.class, error -> {
                 assertThat(error.code()).isEqualTo(QueryErrorCode.INCOMPATIBLE_OPERATOR);
                 assertThat(error.path()).contains("total");
@@ -102,26 +100,30 @@ class JpaPredicateBuilderTest {
 
     private static Stream<Arguments> operatorCases() {
         return Stream.of(
-            Arguments.of("EQ", Filters.eq("status", "PAID"),
+            Arguments.of("EQ", Filters.field("status").eq(OrderStatus.PAID),
                 List.of("PAID-HIGH", "PAID-LOW")),
-            Arguments.of("NE", Filters.ne("status", "PAID"),
+            Arguments.of("NE", Filters.field("status").ne(OrderStatus.PAID),
                 List.of("CANCELLED-NULL", "CREATED-MID")),
-            Arguments.of("GT", Filters.gt("total", "50"), List.of("PAID-HIGH")),
-            Arguments.of("GTE", Filters.gte("total", "50"),
+            Arguments.of("GT", Filters.field("total").gt(new BigDecimal("50")),
+                List.of("PAID-HIGH")),
+            Arguments.of("GTE", Filters.field("total").gte(new BigDecimal("50")),
                 List.of("CREATED-MID", "PAID-HIGH")),
-            Arguments.of("LT", Filters.lt("total", "50"), List.of("PAID-LOW")),
-            Arguments.of("LTE", Filters.lte("total", "50"),
+            Arguments.of("LT", Filters.field("total").lt(new BigDecimal("50")),
+                List.of("PAID-LOW")),
+            Arguments.of("LTE", Filters.field("total").lte(new BigDecimal("50")),
                 List.of("CREATED-MID", "PAID-LOW")),
-            Arguments.of("LIKE", Filters.like("reference", "paid-%"),
+            Arguments.of("LIKE", Filters.field("reference").like("paid-%"),
                 List.of("PAID-HIGH", "PAID-LOW")),
-            Arguments.of("IN", Filters.in("status", "CREATED", "CANCELLED"),
+            Arguments.of("IN", Filters.field("status").in(OrderStatus.CREATED, OrderStatus.CANCELLED),
                 List.of("CANCELLED-NULL", "CREATED-MID")),
-            Arguments.of("BETWEEN", Filters.between("total", "5", "50"),
+            Arguments.of("BETWEEN", Filters.field("total")
+                .between(new BigDecimal("5"), new BigDecimal("50")),
                 List.of("CREATED-MID", "PAID-LOW")),
-            Arguments.of("IS_NULL", Filters.isNull("total"), List.of("CANCELLED-NULL")),
-            Arguments.of("IS_NOT_NULL", Filters.isNotNull("total"),
+            Arguments.of("IS_NULL", Filters.field("total").isNull(),
+                List.of("CANCELLED-NULL")),
+            Arguments.of("IS_NOT_NULL", Filters.field("total").isNotNull(),
                 List.of("CREATED-MID", "PAID-HIGH", "PAID-LOW")),
-            Arguments.of("NOT", Filters.not(Filters.eq("status", "PAID")),
+            Arguments.of("NOT", Filters.field("status").eq(OrderStatus.PAID).not(),
                 List.of("CANCELLED-NULL", "CREATED-MID")));
     }
 

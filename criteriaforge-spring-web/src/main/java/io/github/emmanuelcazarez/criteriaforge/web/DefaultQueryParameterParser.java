@@ -20,32 +20,96 @@ import org.springframework.util.MultiValueMap;
 
 /** Parser for CriteriaForge's compact, backwards-friendly URL convention. */
 public final class DefaultQueryParameterParser implements QueryParameterParser {
+    public static final int DEFAULT_MAX_FILTER_LENGTH = 4096;
+    public static final int DEFAULT_MAX_EXPRESSION_DEPTH = 20;
     private static final String OR_PREFIX = "OR_";
     private static final Set<String> CONTROL_PARAMETERS =
-        Set.of("fields", "sort", "limit", "offset");
+        Set.of("filter", "fields", "sort", "limit", "offset");
     private static final Map<String, Operator> SUFFIX_OPERATORS = suffixOperators();
+    private final int maxFilterLength;
+    private final int maxExpressionDepth;
+
+    public DefaultQueryParameterParser() {
+        this(DEFAULT_MAX_FILTER_LENGTH, DEFAULT_MAX_EXPRESSION_DEPTH);
+    }
+
+    public DefaultQueryParameterParser(int maxFilterLength, int maxExpressionDepth) {
+        if (maxFilterLength < 1 || maxExpressionDepth < 1) {
+            throw new IllegalArgumentException("parser limits must be at least one");
+        }
+        this.maxFilterLength = maxFilterLength;
+        this.maxExpressionDepth = maxExpressionDepth;
+    }
 
     @Override
     public QueryRequest parse(MultiValueMap<String, String> parameters) {
         Objects.requireNonNull(parameters, "parameters must not be null");
         var normalFilters = new ArrayList<FilterExpression>();
         var alternativeFilters = new ArrayList<FilterExpression>();
+        var readableFilter = oneFilterExpression(parameters.get("filter"));
+        var hasSimpleFilters = parameters.keySet().stream()
+            .anyMatch(name -> !CONTROL_PARAMETERS.contains(name));
+        if (readableFilter != null && hasSimpleFilters) {
+            throw malformed(
+                "The filter expression cannot be mixed with simple filter parameters",
+                "filter",
+                null);
+        }
 
-        parameters.forEach((rawName, rawValues) -> {
-            if (!CONTROL_PARAMETERS.contains(rawName)) {
-                var alternative = rawName.startsWith(OR_PREFIX);
-                var name = alternative ? rawName.substring(OR_PREFIX.length()) : rawName;
-                var expression = parseFilter(name, rawValues);
-                (alternative ? alternativeFilters : normalFilters).add(expression);
-            }
-        });
+        if (readableFilter == null) {
+            parameters.forEach((rawName, rawValues) -> {
+                if (!CONTROL_PARAMETERS.contains(rawName)) {
+                    var alternative = rawName.startsWith(OR_PREFIX);
+                    var name = alternative ? rawName.substring(OR_PREFIX.length()) : rawName;
+                    var expression = parseFilter(name, rawValues);
+                    (alternative ? alternativeFilters : normalFilters).add(expression);
+                }
+            });
+        }
 
         var builder = QueryRequest.builder();
-        splitValues(parameters.get("fields")).forEach(field -> builder.select(field));
+        splitValues(parameters.get("fields")).forEach(field -> select(builder, field));
         splitValues(parameters.get("sort")).forEach(token -> builder.sort(parseSort(token)));
-        combine(normalFilters, alternativeFilters).ifPresent(builder::where);
+        if (readableFilter != null) {
+            builder.where(new FilterExpressionParser(
+                readableFilter, maxExpressionDepth).parse());
+        } else {
+            combine(normalFilters, alternativeFilters).ifPresent(builder::where);
+        }
         parsePage(parameters).ifPresent(builder::page);
-        return builder.build();
+        try {
+            return builder.build();
+        } catch (IllegalArgumentException exception) {
+            throw malformed("Malformed query parameters", null, exception);
+        }
+    }
+
+    private String oneFilterExpression(List<String> values) {
+        if (values == null) {
+            return null;
+        }
+        if (values.size() != 1 || values.get(0) == null || values.get(0).isBlank()) {
+            throw malformed("filter must appear exactly once and not be blank", "filter", null);
+        }
+        var expression = values.get(0);
+        if (expression.length() > maxFilterLength) {
+            throw malformed(
+                "filter exceeds maximum length " + maxFilterLength,
+                "filter",
+                null);
+        }
+        return expression;
+    }
+
+    private static void select(QueryRequest.Builder builder, String token) {
+        var match = java.util.regex.Pattern
+            .compile("(?i)^(.+?)\\s+as\\s+(.+)$")
+            .matcher(token);
+        if (match.matches()) {
+            builder.selectAs(match.group(1).trim(), match.group(2).trim());
+        } else {
+            builder.select(token);
+        }
     }
 
     private static FilterExpression parseFilter(String name, List<String> rawValues) {
@@ -95,13 +159,13 @@ public final class DefaultQueryParameterParser implements QueryParameterParser {
         disjunction.addAll(alternatives);
         return java.util.Optional.of(disjunction.size() == 1
             ? disjunction.get(0)
-            : Filters.or(disjunction.toArray(FilterExpression[]::new)));
+            : Filters.anyOf(disjunction));
     }
 
     private static FilterExpression groupAnd(List<FilterExpression> expressions) {
         return expressions.size() == 1
             ? expressions.get(0)
-            : Filters.and(expressions.toArray(FilterExpression[]::new));
+            : Filters.allOf(expressions);
     }
 
     private static SortSpec parseSort(String token) {

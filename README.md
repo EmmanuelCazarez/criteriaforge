@@ -32,6 +32,25 @@ implementation "io.github.emmanuelcazarez:criteriaforge-spring-web:0.1.0"
 
 The web module is deliberately separate. Omit it when another transport creates `QueryRequest` directly.
 
+Register an explicit policy for every entity exposed through the query engine:
+
+```java
+@Bean
+QueryPolicyRegistration orderQueryPolicy() {
+    return QueryPolicyRegistration.forEntity(
+        Order.class,
+        QueryPolicy.builder()
+            .allowFields("id", "reference", "status")
+            .alias("amount", "total")
+            .alias("customerName", "customer.name")
+            .relationshipTraversal(true)
+            .build());
+}
+```
+
+The application fails closed for an unregistered entity and fails startup when
+the same entity is registered twice.
+
 ## One controller, many queries
 
 ```java
@@ -51,34 +70,67 @@ class OrderQueryController {
 }
 ```
 
-This request filters, projects a nested to-one field, sorts, and paginates:
+This request uses a readable nested filter, stable public field names,
+per-request output aliases, sorting, and pagination:
 
 ```text
-GET /api/orders?status_eq=PAID&total_gte=100&fields=id,customer.name,total&sort=-total&limit=20
+GET /api/orders?filter=status == PAID and amount >= 100&fields=reference,customerName as buyer.name,amount as orderTotal&sort=-amount&limit=20
 ```
 
 The controller contains no Criteria API or field-specific query logic. See the runnable [`criteriaforge-example`](criteriaforge-example/) for entity policies, dummy H2 data, and error mapping.
 
-## Supported URL syntax
+## Two input styles
 
-| Capability | Syntax | Example |
-| --- | --- | --- |
-| Equal / not equal | `_eq`, `_not` | `status_eq=PAID` |
-| Ordering | `_gt`, `_gte`, `_lt`, `_lte` | `total_gte=100` |
-| Text pattern | `_like` | `reference_like=ORD-%` |
-| Membership | `_in` or no suffix | `status_in=PAID,CREATED` |
-| Range | `_between` | `total_between=10,100` |
-| Null checks | `_isnull`, `_notnull` with `true` | `closedAt_isnull=true` |
-| Alternatives | `OR_` prefix | `OR_status_eq=CREATED` |
-| Projection | `fields` | `fields=id,customer.name` |
-| Sorting | `sort`, prefix `-` for descending | `sort=-createdAt,reference` |
-| Pagination | `limit` and optional `offset` | `limit=20&offset=40` |
+Readable expressions support `==`, `!=`, `>`, `>=`, `<`, `<=`, `like`,
+`in`, `between`, `is null`, `is not null`, `and`, `or`, `not`, and
+parentheses:
 
-Repeated values and comma-separated values are both accepted. Full semantics and the programmatic nested boolean API are in [Query language](docs/query-language.md).
+```text
+filter=status == PAID and (amount >= 100 or customer.country in ("MX","US"))
+```
+
+The compact flat syntax remains available:
+
+```text
+status_eq=PAID&total_gte=100&reference_like=ORD-%
+```
+
+Do not mix the two filter styles in one request. Projection uses `fields`,
+sorting uses `sort` with `-` for descending, and pagination uses `limit` with an
+optional `offset`. Full syntax, precedence, projection aliases, parser limits,
+and the fluent Java API are in [Query language](docs/query-language.md).
+
+## Queries built in application code
+
+The web adapter is not required. A service can build the same request with typed
+values:
+
+```java
+var filter = field("status").eq(OrderStatus.PAID)
+    .and(field("amount").gte(minimumTotal))
+    .and(field("customer.country").in(countries));
+
+var query = QueryRequest.builder()
+    .select("reference")
+    .selectAs("customerName", "buyer.name")
+    .selectAs("amount", "orderTotal")
+    .where(filter)
+    .sort(SortSpec.desc("amount"))
+    .page(PageSpec.offset(0, 20))
+    .build();
+
+return queryEngine.execute(Order.class, query);
+```
+
+See the tested `OrderSearchService` in the example module.
 
 ## Security first
 
-Dynamic filtering exposes part of your persistence model as an API. Do not treat it as authorization. Root scalar fields are queryable by default, relationship traversal is disabled by default, and page/condition/depth limits are enforced. Mark secrets with `@QueryHidden` and define explicit `QueryPolicy` allowlists for public endpoints. Read [Security and query policy](docs/security.md) before exposing a query endpoint.
+Dynamic filtering exposes part of your persistence model as an API. Do not treat
+it as authorization. Register each entity explicitly, use policy allowlists and
+stable public names, mark secrets with `@QueryHidden`, and apply mandatory row
+restrictions in application code. Read
+[Security and query policy](docs/security.md) before exposing a query endpoint.
 
 ## Compatibility
 

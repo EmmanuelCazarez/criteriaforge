@@ -1,5 +1,8 @@
 package io.github.emmanuelcazarez.criteriaforge.autoconfigure;
 
+import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicyRegistration;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
 import io.github.emmanuelcazarez.criteriaforge.jpa.JpaQueryEngine;
 import io.github.emmanuelcazarez.criteriaforge.jpa.QueryEngine;
 import io.github.emmanuelcazarez.criteriaforge.jpa.QueryPolicyProvider;
@@ -10,8 +13,9 @@ import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import java.util.LinkedHashMap;
+import java.util.List;
 
 /** Creates CriteriaForge infrastructure when Jakarta Persistence is available. */
 @AutoConfiguration
@@ -20,14 +24,33 @@ import org.springframework.context.annotation.Bean;
     "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration"
 })
 @ConditionalOnClass({EntityManager.class, QueryEngine.class})
-@EnableConfigurationProperties(CriteriaForgeProperties.class)
 public class CriteriaForgeAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
-    QueryPolicyProvider criteriaForgeQueryPolicyProvider(CriteriaForgeProperties properties) {
-        var policy = properties.toPolicy();
-        return ignored -> policy;
+    QueryPolicyProvider criteriaForgeQueryPolicyProvider(
+            List<QueryPolicyRegistration> registrations) {
+        var policies = new LinkedHashMap<Class<?>, QueryPolicyRegistration>();
+        for (var registration : registrations) {
+            var duplicate = policies.putIfAbsent(registration.entityType(), registration);
+            if (duplicate != null) {
+                throw new IllegalStateException(
+                    "Duplicate CriteriaForge policy registration for "
+                        + registration.entityType().getName());
+            }
+        }
+        var immutablePolicies = java.util.Map.copyOf(policies);
+        return entityType -> {
+            var registration = immutablePolicies.get(entityType);
+            if (registration == null) {
+                throw new QueryValidationException(
+                    QueryErrorCode.QUERY_POLICY_NOT_FOUND,
+                    "No CriteriaForge query policy is registered for "
+                        + entityType.getName(),
+                    entityType.getName());
+            }
+            return registration.policy();
+        };
     }
 
     @Bean

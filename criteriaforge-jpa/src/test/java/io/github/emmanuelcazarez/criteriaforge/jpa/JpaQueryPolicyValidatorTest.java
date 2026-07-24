@@ -37,7 +37,9 @@ class JpaQueryPolicyValidatorTest {
 
     @Test
     void rejectsQueryHiddenFieldsBeforeExecutingSql() {
-        var query = QueryRequest.builder().where(Filters.eq("secretNote", "value")).build();
+        var query = QueryRequest.builder()
+            .where(Filters.field("secretNote").eq("value"))
+            .build();
 
         assertRejected(query, QueryPolicy.defaults(), QueryErrorCode.FIELD_NOT_ALLOWED);
     }
@@ -50,7 +52,7 @@ class JpaQueryPolicyValidatorTest {
             .build();
 
         assertRejected(
-            QueryRequest.builder().where(Filters.eq("reference", "A")).build(),
+            QueryRequest.builder().where(Filters.field("reference").eq("A")).build(),
             policy,
             QueryErrorCode.FIELD_NOT_ALLOWED);
     }
@@ -58,7 +60,7 @@ class JpaQueryPolicyValidatorTest {
     @Test
     void relationshipTraversalIsDisabledByDefault() {
         assertRejected(
-            QueryRequest.builder().where(Filters.eq("customer.name", "Ana")).build(),
+            QueryRequest.builder().where(Filters.field("customer.name").eq("Ana")).build(),
             QueryPolicy.defaults(),
             QueryErrorCode.RELATIONSHIP_TRAVERSAL_DISABLED);
     }
@@ -70,7 +72,7 @@ class JpaQueryPolicyValidatorTest {
             .maxDepth(0)
             .build();
         assertRejected(
-            QueryRequest.builder().where(Filters.eq("customer.name", "Ana")).build(),
+            QueryRequest.builder().where(Filters.field("customer.name").eq("Ana")).build(),
             shallow,
             QueryErrorCode.RELATIONSHIP_DEPTH_EXCEEDED);
 
@@ -78,7 +80,7 @@ class JpaQueryPolicyValidatorTest {
             .allowOperators("total", Operator.EQ)
             .build();
         assertRejected(
-            QueryRequest.builder().where(Filters.gt("total", "10")).build(),
+            QueryRequest.builder().where(Filters.field("total").gt("10")).build(),
             equalityOnly,
             QueryErrorCode.UNSUPPORTED_OPERATOR);
     }

@@ -1,113 +1,190 @@
 # Query language
 
-CriteriaForge uses `QueryRequest` as its transport-neutral query model. A request contains an optional filter expression tree, ordered projection fields, ordered sort fields, and optional offset pagination. All public collections are immutable after construction.
+CriteriaForge uses `QueryRequest` as its transport-neutral model. A request can
+contain one filter expression, ordered projections, ordered sorts, and offset
+pagination. The same model can be created by application code or by the optional
+Spring Web adapter.
 
 ## Programmatic queries
 
+Programmatic filters keep their Java values typed:
+
 ```java
-import static io.github.emmanuelcazarez.criteriaforge.core.Filters.*;
-import static io.github.emmanuelcazarez.criteriaforge.core.PageSpec.offset;
-import static io.github.emmanuelcazarez.criteriaforge.core.SortSpec.desc;
+import static io.github.emmanuelcazarez.criteriaforge.core.Filters.field;
+
+var filter = field("status").eq(OrderStatus.PAID)
+    .and(field("amount").gte(minimumTotal))
+    .and(
+        field("customer.country").eq("MX")
+            .or(field("customer.country").eq("US"))
+    )
+    .and(field("cancelledAt").isNull());
 
 var query = QueryRequest.builder()
-    .select("id", "customer.name", "total")
-    .where(and(
-        eq("status", "PAID"),
-        gte("total", "100.00"),
-        or(like("customer.name", "Ana%"), in("customer.country", "MX", "US"))))
-    .sort(desc("total"))
-    .page(offset(0, 20))
+    .select("reference")
+    .selectAs("customerName", "buyer.name")
+    .selectAs("amount", "orderTotal")
+    .where(filter)
+    .sort(SortSpec.desc("amount"))
+    .page(PageSpec.offset(0, 20))
     .build();
 ```
 
-Use the `Filters` factory methods rather than constructing expression nodes. `FilterExpression` only gives `QueryRequest` and persistence adapters a common type; its concrete representations are not part of the consumer API.
+Use `Filters.allOf(collection)`, `Filters.anyOf(collection)`, and
+`Filters.not(expression)` when expressions are collected dynamically.
+`FilterExpression` is intentionally opaque; consumers do not construct its
+internal nodes.
 
-Values enter the model as strings and are converted to the Java type resolved from the JPA metamodel. Supported targets include primitive wrappers, `BigInteger`, `BigDecimal`, booleans, enums, UUIDs, `LocalDate`, `LocalTime`, `LocalDateTime`, `OffsetDateTime`, and `Instant`.
+Enums, `BigDecimal`, dates, UUIDs, booleans, and other values supplied by Java
+remain typed. String values from HTTP are converted to the Java type discovered
+through the JPA metamodel. A non-string Java value that does not match the
+resolved field type is rejected rather than silently coerced.
 
-## Operators
+The runnable example builds a complete request in
+`OrderSearchService`, demonstrating that Spring Web is optional.
 
-| Core operator | URL suffix | Arity | Valid use |
-| --- | --- | ---: | --- |
-| `EQ` | `_eq` | 1 | Any supported scalar type |
-| `NE` | `_not` | 1 | Any supported scalar type |
-| `GT` | `_gt` | 1 | Comparable types |
-| `GTE` | `_gte` | 1 | Comparable types |
-| `LT` | `_lt` | 1 | Comparable types |
-| `LTE` | `_lte` | 1 | Comparable types |
-| `LIKE` | `_like` | 1 | Text only; SQL `%` and `_` wildcards are preserved |
-| `IN` | `_in` or no suffix | 1+ | Any supported scalar type |
-| `BETWEEN` | `_between` | 2 | Comparable types |
-| `IS_NULL` | `_isnull=true` | 0 | Any nullable field |
-| `IS_NOT_NULL` | `_notnull=true` | 0 | Any nullable field |
+## Readable HTTP filters
 
-`LIKE` is case-insensitive. An incompatible operator, invalid arity, unknown field, or failed conversion produces a stable validation error before query execution.
-
-## HTTP parameter rules
-
-Normal filter parameters are combined with `AND` in encounter order:
+Use one `filter` parameter for nested boolean expressions:
 
 ```text
-status_eq=PAID&total_gte=100
+filter=status == PAID and (amount >= 100 or customer.country in ("MX","US"))
 ```
 
-`OR_` parameters are alternatives. If normal filters also exist, the expression is `OR(AND(normal filters), each OR_ filter)`:
+The grammar supports:
+
+| Operation | Syntax |
+|---|---|
+| Equal / not equal | `status == PAID`, `status != CANCELLED` |
+| Ordering | `total > 10`, `total >= 10`, `total < 20`, `total <= 20` |
+| Text pattern | `reference like "ORD-%"` |
+| Membership | `country in ("MX","US")` |
+| Range | `total between 10 and 100` |
+| Null checks | `cancelledAt is null`, `cancelledAt is not null` |
+| Boolean composition | `and`, `or`, `not`, parentheses |
+
+Keywords are case-insensitive. Values can be unquoted when they contain no
+spaces or delimiters. Single- and double-quoted values are supported; a
+backslash escapes the following character.
+
+Precedence, from strongest to weakest, is:
+
+1. Parentheses
+2. `not`
+3. Comparison operators
+4. `and`
+5. `or`
+
+The default maximum filter length is 4096 characters and the default nested
+expression depth is 20. Spring Boot consumers can lower these limits:
+
+```yaml
+criteriaforge:
+  web:
+    max-filter-length: 2048
+    max-expression-depth: 12
+```
+
+## Compact HTTP filters
+
+The original flat syntax remains useful for simple requests:
+
+```text
+status_eq=PAID&total_gte=100&reference_like=ORD-%
+```
+
+| Core operator | Compact suffix | Arity |
+|---|---|---:|
+| `EQ` | `_eq` | 1 |
+| `NE` | `_not` | 1 |
+| `GT` | `_gt` | 1 |
+| `GTE` | `_gte` | 1 |
+| `LT` | `_lt` | 1 |
+| `LTE` | `_lte` | 1 |
+| `LIKE` | `_like` | 1 |
+| `IN` | `_in` or no suffix | 1+ |
+| `BETWEEN` | `_between` | 2 |
+| `IS_NULL` | `_isnull=true` | 0 |
+| `IS_NOT_NULL` | `_notnull=true` | 0 |
+
+Repeated and comma-separated values are equivalent for `IN`. Normal compact
+filters are combined with `AND`. `OR_` parameters are flat alternatives:
 
 ```text
 status_eq=PAID&total_gte=100&OR_status_eq=CREATED
 ```
 
-means `(status = PAID AND total >= 100) OR status = CREATED`.
+means `(status == PAID and total >= 100) or status == CREATED`.
 
-The compact URL syntax intentionally supports flat alternatives only. Build `QueryRequest` directly for arbitrarily nested `AND`, `OR`, and `NOT` groups.
+Do not mix a readable `filter` expression with compact filter parameters in one
+request. CriteriaForge rejects the request instead of guessing precedence.
 
-Repeated and comma-separated values are equivalent for membership:
+## Public field names
 
-```text
-status_in=PAID,CREATED
-status_in=PAID&status_in=CREATED
-status=PAID,CREATED
+Entity policies can expose stable query names independently of JPA attributes:
+
+```java
+var policy = QueryPolicy.builder()
+    .allowFields("id", "reference", "status")
+    .alias("amount", "total")
+    .alias("customerName", "customer.name")
+    .allowOperators("amount", Operator.EQ, Operator.GTE, Operator.LTE)
+    .relationshipTraversal(true)
+    .build();
 ```
 
-An un-suffixed filter is `IN`, not equality. Unknown operator-looking suffixes are rejected rather than treated as field names.
+Callers then filter, sort, and select with `amount` and `customerName`. The
+mapping is stable for the entity policy; changing a response key remains a
+per-request concern.
 
-## Paths and relationships
+## Projection and output aliases
 
-Paths use dot notation, such as `customer.country`. Root scalar fields are available by default. Relationship traversal must be enabled by policy.
-
-- Filters may traverse to-one and to-many relationships.
-- Sorting and projection may traverse root and to-one paths.
-- Sorting or projecting through a to-many path is rejected in 0.1.x.
-- Reused paths share joins.
-- Collection filters use distinct roots and distinct counts to prevent duplicate results.
-
-## Projection
-
-`fields` preserves declared order. A projected nested to-one path becomes a nested map:
+Without `fields`, `QueryEngine.execute(...)` returns full entities. With
+`fields`, it returns insertion-ordered nested maps.
 
 ```text
-fields=id,customer.name,customer.country,total
+fields=reference,customerName as buyer.name,amount as orderTotal
 ```
 
 ```json
 {
-  "id": 7,
-  "customer": {"name": "Ana", "country": "MX"},
-  "total": 125.00
+  "reference": "ORD-102",
+  "buyer": {"name": "Luis"},
+  "orderTotal": 250.00
 }
 ```
 
-Call `QueryEngine.execute(...)` in both cases. The engine returns full entities when `fields` is absent and projected maps when fields are selected.
+The Java equivalent is:
 
-## Sorting and pagination
-
-Sort tokens are evaluated left to right. Plain or `+` fields are ascending; `-` fields are descending:
-
-```text
-sort=-createdAt,+reference
+```java
+QueryRequest.builder()
+    .select("reference")
+    .selectAs("customerName", "buyer.name")
+    .selectAs("amount", "orderTotal")
+    .build();
 ```
 
-Without explicit sorting, CriteriaForge orders by the entity identifier discovered through the JPA metamodel. It never assumes the identifier is named `id`.
+Source and output paths are separate. Request order is preserved, selected null
+values are present explicitly, and nested output paths create nested maps.
+Duplicate sources, duplicate outputs, and parent/child output collisions are
+rejected. Projection through a to-many relationship is not supported in 0.1.x.
 
-`limit` is required when `offset` is supplied. Offset defaults to zero. `QueryResult` reports `content`, `total`, `offset`, and `limit`; total counts are independent of page size.
+## Paths, sorting, and pagination
 
-See [Security and query policy](security.md) for field exposure and complexity limits.
+Paths use dot notation. Filters may traverse to-one and to-many relationships
+when the entity policy allows it. Sorting and projection may traverse root and
+to-one paths. Reused paths share joins; to-many filters use distinct roots and
+distinct counts.
+
+Sort tokens are evaluated left to right. Plain or `+` fields are ascending and
+`-` fields are descending:
+
+```text
+sort=-amount,+reference
+```
+
+Without an explicit sort, CriteriaForge orders by the JPA identifier discovered
+from the metamodel. `limit` is required when `offset` is present; offset defaults
+to zero. `QueryResult` contains `content`, `total`, `offset`, and `limit`.
+
+See [Security and query policy](security.md) before exposing a query endpoint.

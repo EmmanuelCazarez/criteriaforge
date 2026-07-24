@@ -18,16 +18,22 @@ public final class QueryPolicy {
     private final int maxConditions;
     private final int maxDepth;
     private final boolean relationshipTraversal;
+    private final boolean allowlistEnabled;
     private final Set<String> allowedFields;
     private final Set<String> deniedFields;
     private final Map<String, Set<Operator>> allowedOperators;
+    private final Map<String, String> aliases;
 
     private QueryPolicy(Builder builder) {
         maxPageSize = requirePositive(builder.maxPageSize, "maxPageSize");
         maxConditions = requirePositive(builder.maxConditions, "maxConditions");
         maxDepth = requireNonNegative(builder.maxDepth, "maxDepth");
         relationshipTraversal = builder.relationshipTraversal;
-        allowedFields = immutablePaths(builder.allowedFields, "allowed field");
+        allowlistEnabled = !builder.allowedFields.isEmpty();
+        aliases = immutableAliases(builder.aliases);
+        var exposedFields = new LinkedHashSet<>(builder.allowedFields);
+        exposedFields.addAll(aliases.keySet());
+        allowedFields = immutablePaths(exposedFields, "allowed field");
         deniedFields = immutablePaths(builder.deniedFields, "denied field");
         allowedOperators = immutableOperators(builder.allowedOperators);
     }
@@ -68,16 +74,26 @@ public final class QueryPolicy {
         return allowedOperators;
     }
 
+    public Map<String, String> aliases() {
+        return aliases;
+    }
+
     public boolean isFieldAllowed(String field) {
         var normalized = QueryPath.requireValid(field, "field");
         return !deniedFields.contains(normalized)
-            && (allowedFields.isEmpty() || allowedFields.contains(normalized));
+            && (!allowlistEnabled || allowedFields.contains(normalized));
     }
 
     public boolean isOperatorAllowed(String field, Operator operator) {
         Objects.requireNonNull(operator, "operator must not be null");
         var configured = allowedOperators.get(QueryPath.requireValid(field, "field"));
         return configured == null || configured.contains(operator);
+    }
+
+    /** Resolves a public query field to its persistent JPA path. */
+    public String resolveField(String field) {
+        var normalized = QueryPath.requireValid(field, "field");
+        return aliases.getOrDefault(normalized, normalized);
     }
 
     private static int requirePositive(int value, String label) {
@@ -111,6 +127,14 @@ public final class QueryPolicy {
         return Map.copyOf(copy);
     }
 
+    private static Map<String, String> immutableAliases(Map<String, String> configured) {
+        var copy = new LinkedHashMap<String, String>();
+        configured.forEach((publicName, persistentPath) -> copy.put(
+            QueryPath.requireValid(publicName, "public field"),
+            QueryPath.requireValid(persistentPath, "persistent field")));
+        return Map.copyOf(copy);
+    }
+
     /** Builder for per-entity or global query policies. */
     public static final class Builder {
         private int maxPageSize = DEFAULT_MAX_PAGE_SIZE;
@@ -120,6 +144,7 @@ public final class QueryPolicy {
         private final Set<String> allowedFields = new LinkedHashSet<>();
         private final Set<String> deniedFields = new LinkedHashSet<>();
         private final Map<String, Set<Operator>> allowedOperators = new LinkedHashMap<>();
+        private final Map<String, String> aliases = new LinkedHashMap<>();
 
         private Builder() {
         }
@@ -161,6 +186,17 @@ public final class QueryPolicy {
         public Builder allowOperators(String field, Operator... operators) {
             Objects.requireNonNull(operators, "operators must not be null");
             allowedOperators.put(field, Set.copyOf(Arrays.asList(operators)));
+            return this;
+        }
+
+        public Builder alias(String publicName, String persistentPath) {
+            var normalizedPublicName = QueryPath.requireValid(publicName, "public field");
+            var normalizedPersistentPath =
+                QueryPath.requireValid(persistentPath, "persistent field");
+            if (aliases.putIfAbsent(normalizedPublicName, normalizedPersistentPath) != null) {
+                throw new IllegalArgumentException(
+                    "public field alias is already registered: " + normalizedPublicName);
+            }
             return this;
         }
 

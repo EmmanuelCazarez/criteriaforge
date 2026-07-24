@@ -4,16 +4,17 @@ import java.util.List;
 import java.util.Objects;
 
 /** A leaf filter that applies one operator to one persistent field path. */
-record Condition(String field, Operator operator, List<String> values)
+record Condition(String field, Operator operator, List<Object> values)
         implements FilterExpression {
 
     Condition {
         field = QueryPath.requireValid(field, "field");
         operator = Objects.requireNonNull(operator, "operator must not be null");
-        values = List.copyOf(Objects.requireNonNull(values, "values must not be null"));
+        Objects.requireNonNull(values, "values must not be null");
         if (values.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException("condition values must not contain null");
         }
+        values = List.copyOf(values);
         validateArity(operator, values.size());
     }
 

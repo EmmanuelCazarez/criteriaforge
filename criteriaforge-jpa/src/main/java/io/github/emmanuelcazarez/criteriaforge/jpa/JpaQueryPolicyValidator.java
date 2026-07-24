@@ -30,7 +30,7 @@ final class JpaQueryPolicyValidator {
         Objects.requireNonNull(policy, "policy must not be null");
 
         query.filter().ifPresent(expression -> validateFilter(entityType, expression, policy));
-        query.fields().forEach(field -> validateProjection(entityType, field, policy));
+        query.fields().forEach(field -> validateProjection(entityType, field.source(), policy));
         query.sorts().forEach(sort -> validateSort(entityType, sort.field(), policy));
     }
 
@@ -38,8 +38,8 @@ final class JpaQueryPolicyValidator {
             Class<?> entityType, FilterExpression expression, QueryPolicy policy) {
         expression.accept(new FilterExpression.Visitor<Void>() {
             @Override
-            public Void condition(String field, Operator operator, List<String> values) {
-                var metadata = resolve(entityType, field);
+            public Void condition(String field, Operator operator, List<Object> values) {
+                var metadata = resolve(entityType, policy.resolveField(field));
                 validateCommon(field, metadata, policy);
                 if (!policy.isOperatorAllowed(field, operator)) {
                     throw rejected(
@@ -75,7 +75,7 @@ final class JpaQueryPolicyValidator {
     }
 
     private void validateProjection(Class<?> entityType, String field, QueryPolicy policy) {
-        var metadata = resolve(entityType, field);
+        var metadata = resolve(entityType, policy.resolveField(field));
         validateCommon(field, metadata, policy);
         if (metadata.plural() || isManagedType(metadata.javaType())) {
             throw rejected(
@@ -86,7 +86,7 @@ final class JpaQueryPolicyValidator {
     }
 
     private void validateSort(Class<?> entityType, String field, QueryPolicy policy) {
-        var metadata = resolve(entityType, field);
+        var metadata = resolve(entityType, policy.resolveField(field));
         validateCommon(field, metadata, policy);
         if (metadata.plural()) {
             throw rejected(

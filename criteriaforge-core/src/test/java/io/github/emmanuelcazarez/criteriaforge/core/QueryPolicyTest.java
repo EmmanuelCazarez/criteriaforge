@@ -33,11 +33,12 @@ class QueryPolicyTest {
 
     @Test
     void countsConditionsAcrossNestedGroupsAndNegations() {
-        var query = QueryRequest.builder().where(Filters.and(
-            Filters.eq("a", "1"),
-            Filters.not(Filters.or(
-                Filters.eq("b", "2"),
-                Filters.eq("c", "3"))))).build();
+        var query = QueryRequest.builder().where(
+            Filters.field("a").eq("1")
+                .and(Filters.field("b").eq("2")
+                    .or(Filters.field("c").eq("3"))
+                    .not()))
+            .build();
         var policy = QueryPolicy.builder().maxConditions(2).build();
 
         assertThatThrownBy(() -> validator.validate(query, policy))
@@ -60,5 +61,24 @@ class QueryPolicyTest {
         assertThat(policy.isOperatorAllowed("id", Operator.LIKE)).isFalse();
         assertThatThrownBy(() -> policy.allowedFields().add("secret"))
             .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void exposesStablePublicNamesAndResolvesThemToPersistentPaths() {
+        var policy = QueryPolicy.builder()
+            .allowFields("id", "status")
+            .alias("amount", "total")
+            .alias("customerName", "customer.name")
+            .allowOperators("amount", Operator.EQ, Operator.GTE)
+            .build();
+
+        assertThat(policy.isFieldAllowed("amount")).isTrue();
+        assertThat(policy.resolveField("amount")).isEqualTo("total");
+        assertThat(policy.resolveField("customerName")).isEqualTo("customer.name");
+        assertThat(policy.resolveField("status")).isEqualTo("status");
+        assertThat(policy.isOperatorAllowed("amount", Operator.GTE)).isTrue();
+        assertThat(policy.isOperatorAllowed("amount", Operator.LIKE)).isFalse();
+        assertThat(policy.aliases()).containsExactlyInAnyOrderEntriesOf(
+            java.util.Map.of("amount", "total", "customerName", "customer.name"));
     }
 }

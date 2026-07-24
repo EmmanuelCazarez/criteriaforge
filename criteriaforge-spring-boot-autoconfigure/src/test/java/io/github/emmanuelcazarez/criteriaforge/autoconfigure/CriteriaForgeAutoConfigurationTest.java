@@ -1,9 +1,14 @@
 package io.github.emmanuelcazarez.criteriaforge.autoconfigure;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicyRegistration;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryResult;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
 import io.github.emmanuelcazarez.criteriaforge.jpa.QueryEngine;
 import io.github.emmanuelcazarez.criteriaforge.jpa.QueryPolicyProvider;
 import io.github.emmanuelcazarez.criteriaforge.web.CriteriaForgeWebMvcConfigurer;
@@ -18,6 +23,7 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.util.LinkedMultiValueMap;
 
 class CriteriaForgeAutoConfigurationTest {
 
@@ -27,33 +33,39 @@ class CriteriaForgeAutoConfigurationTest {
             CriteriaForgeWebAutoConfiguration.class));
 
     @Test
-    void configuresTheQueryEngineAndDefaultPolicyWhenJpaIsAvailable() {
-        contextRunner.withUserConfiguration(JpaBeans.class).run(context -> {
+    void configuresTheQueryEngineWithExplicitPerEntityPolicies() {
+        contextRunner
+            .withUserConfiguration(JpaBeans.class, RegisteredPolicy.class)
+            .run(context -> {
             assertThat(context).hasSingleBean(QueryEngine.class);
             assertThat(context).hasSingleBean(QueryPolicyProvider.class);
             var policy = context.getBean(QueryPolicyProvider.class).policyFor(Object.class);
-            assertThat(policy.maxPageSize()).isEqualTo(100);
-            assertThat(policy.maxConditions()).isEqualTo(25);
-            assertThat(policy.maxDepth()).isEqualTo(2);
-            assertThat(policy.relationshipTraversal()).isFalse();
+            assertThat(policy.maxPageSize()).isEqualTo(40);
+            assertThat(policy.allowedFields()).contains("id");
         });
     }
 
     @Test
-    void bindsConsumerSafetyProperties() {
+    void failsClosedWhenAnEntityHasNoRegisteredPolicy() {
         contextRunner
             .withUserConfiguration(JpaBeans.class)
-            .withPropertyValues(
-                "criteriaforge.query.max-page-size=40",
-                "criteriaforge.query.max-conditions=12",
-                "criteriaforge.query.max-depth=1",
-                "criteriaforge.query.relationship-traversal=true")
             .run(context -> {
-                var policy = context.getBean(QueryPolicyProvider.class).policyFor(Object.class);
-                assertThat(policy.maxPageSize()).isEqualTo(40);
-                assertThat(policy.maxConditions()).isEqualTo(12);
-                assertThat(policy.maxDepth()).isEqualTo(1);
-                assertThat(policy.relationshipTraversal()).isTrue();
+                var provider = context.getBean(QueryPolicyProvider.class);
+                assertThatThrownBy(() -> provider.policyFor(Object.class))
+                    .isInstanceOfSatisfying(QueryValidationException.class, error ->
+                        assertThat(error.code())
+                            .isEqualTo(QueryErrorCode.QUERY_POLICY_NOT_FOUND));
+            });
+    }
+
+    @Test
+    void rejectsDuplicateRegistrationsDuringStartup() {
+        contextRunner
+            .withUserConfiguration(JpaBeans.class, DuplicatePolicies.class)
+            .run(context -> {
+                assertThat(context).hasFailed();
+                assertThat(context.getStartupFailure())
+                    .hasMessageContaining("Duplicate CriteriaForge policy registration");
             });
     }
 
@@ -76,6 +88,22 @@ class CriteriaForgeAutoConfigurationTest {
             assertThat(context).hasSingleBean(QueryParameterParser.class);
             assertThat(context).hasSingleBean(CriteriaForgeWebMvcConfigurer.class);
         });
+    }
+
+    @Test
+    void bindsReadableFilterParserLimits() {
+        contextRunner
+            .withPropertyValues(
+                "criteriaforge.web.max-filter-length=10",
+                "criteriaforge.web.max-expression-depth=2")
+            .run(context -> {
+                var parameters = new LinkedMultiValueMap<String, String>();
+                parameters.add("filter", "status == PAID");
+
+                assertThatThrownBy(() ->
+                    context.getBean(QueryParameterParser.class).parse(parameters))
+                    .isInstanceOf(QueryValidationException.class);
+            });
     }
 
     @Configuration(proxyBeanMethods = false)
@@ -107,6 +135,29 @@ class CriteriaForgeAutoConfigurationTest {
                     return new QueryResult<>(List.of(), 0, 0, 1);
                 }
             };
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class RegisteredPolicy {
+        @Bean
+        QueryPolicyRegistration objectQueryPolicy() {
+            return QueryPolicyRegistration.forEntity(
+                Object.class,
+                QueryPolicy.builder().allowFields("id").maxPageSize(40).build());
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class DuplicatePolicies {
+        @Bean
+        QueryPolicyRegistration firstObjectPolicy() {
+            return QueryPolicyRegistration.forEntity(Object.class, QueryPolicy.defaults());
+        }
+
+        @Bean
+        QueryPolicyRegistration secondObjectPolicy() {
+            return QueryPolicyRegistration.forEntity(Object.class, QueryPolicy.defaults());
         }
     }
 

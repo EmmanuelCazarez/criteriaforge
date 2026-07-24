@@ -90,11 +90,10 @@ class PostgreSqlQueryIntegrationTest {
     @Test
     void preservesPostgreSqlTextDecimalEnumAndOffsetDateTimeSemantics() {
         var query = QueryRequest.builder()
-            .where(Filters.and(
-                Filters.like("reference", "alpha-%"),
-                Filters.eq("status", "paid"),
-                Filters.eq("total", "1234567890.1234"),
-                Filters.gte("createdAt", "2026-07-18T17:15:30Z")))
+            .where(Filters.field("reference").like("alpha-%")
+                .and(Filters.field("status").eq("paid"))
+                .and(Filters.field("total").eq("1234567890.1234"))
+                .and(Filters.field("createdAt").gte("2026-07-18T17:15:30Z")))
             .page(PageSpec.offset(0, 10))
             .build();
 
@@ -111,7 +110,7 @@ class PostgreSqlQueryIntegrationTest {
     @Test
     void keepsDistinctPaginationAndCountsAcrossPluralJoins() {
         var query = QueryRequest.builder()
-            .where(Filters.eq("items.product.name", "Widget"))
+            .where(Filters.field("items.product.name").eq("Widget"))
             .sort(SortSpec.asc("reference"))
             .page(PageSpec.offset(0, 1))
             .build();

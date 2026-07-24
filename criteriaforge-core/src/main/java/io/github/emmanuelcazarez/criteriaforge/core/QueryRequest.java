@@ -10,7 +10,7 @@ import java.util.Optional;
 
 /** Immutable, transport-neutral dynamic query request. */
 public record QueryRequest(
-        List<String> fields,
+        List<ProjectionField> fields,
         Optional<FilterExpression> filter,
         List<SortSpec> sorts,
         Optional<PageSpec> page) {
@@ -29,20 +29,41 @@ public record QueryRequest(
         return new Builder();
     }
 
-    private static List<String> validateFields(List<String> requestedFields) {
+    private static List<ProjectionField> validateFields(List<ProjectionField> requestedFields) {
         Objects.requireNonNull(requestedFields, "fields must not be null");
         var validated = requestedFields.stream()
-            .map(field -> QueryPath.requireValid(field, "projection field"))
+            .map(field -> Objects.requireNonNull(field, "fields must not contain null"))
             .toList();
-        if (new LinkedHashSet<>(validated).size() != validated.size()) {
-            throw new IllegalArgumentException("projection fields must not contain duplicates");
+        var sources = validated.stream().map(ProjectionField::source).toList();
+        if (new LinkedHashSet<>(sources).size() != sources.size()) {
+            throw new IllegalArgumentException("projection sources must not contain duplicates");
         }
+        validateOutputPaths(validated);
         return List.copyOf(validated);
+    }
+
+    private static void validateOutputPaths(List<ProjectionField> fields) {
+        var outputs = fields.stream().map(ProjectionField::output).toList();
+        if (new LinkedHashSet<>(outputs).size() != outputs.size()) {
+            throw new IllegalArgumentException("projection output paths must not contain duplicates");
+        }
+        for (int left = 0; left < outputs.size(); left++) {
+            for (int right = left + 1; right < outputs.size(); right++) {
+                if (isParent(outputs.get(left), outputs.get(right))
+                        || isParent(outputs.get(right), outputs.get(left))) {
+                    throw new IllegalArgumentException("projection output paths must not collide");
+                }
+            }
+        }
+    }
+
+    private static boolean isParent(String possibleParent, String possibleChild) {
+        return possibleChild.startsWith(possibleParent + ".");
     }
 
     /** Mutable builder that creates an immutable {@link QueryRequest}. */
     public static final class Builder {
-        private final List<String> fields = new ArrayList<>();
+        private final List<ProjectionField> fields = new ArrayList<>();
         private final List<SortSpec> sorts = new ArrayList<>();
         private FilterExpression filter;
         private PageSpec page;
@@ -55,7 +76,15 @@ public record QueryRequest(
         }
 
         public Builder select(Collection<String> fields) {
-            this.fields.addAll(Objects.requireNonNull(fields, "fields must not be null"));
+            Objects.requireNonNull(fields, "fields must not be null")
+                .stream()
+                .map(ProjectionField::of)
+                .forEach(this.fields::add);
+            return this;
+        }
+
+        public Builder selectAs(String source, String output) {
+            this.fields.add(ProjectionField.aliased(source, output));
             return this;
         }
 

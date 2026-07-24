@@ -36,7 +36,7 @@ final class JpaSortBuilder {
             CriteriaBuilder criteriaBuilder,
             QueryPolicy policy,
             JoinRegistry joins) {
-        var resolved = pathResolver.resolve(root, sort.field(), joins);
+        var resolved = pathResolver.resolve(root, policy.resolveField(sort.field()), joins);
         if (!policy.isFieldAllowed(sort.field())) {
             throw rejected(QueryErrorCode.FIELD_NOT_ALLOWED, "Sort field is not allowed", sort);
         }

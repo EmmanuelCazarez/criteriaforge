@@ -57,7 +57,7 @@ final class JpaPredicateBuilder {
             JoinRegistry joins) {
         return expression.accept(new FilterExpression.Visitor<>() {
             @Override
-            public Predicate condition(String field, Operator operator, List<String> values) {
+            public Predicate condition(String field, Operator operator, List<Object> values) {
                 return buildCondition(
                     field, operator, values, root, criteriaBuilder, policy, joins);
             }
@@ -89,12 +89,12 @@ final class JpaPredicateBuilder {
     private Predicate buildCondition(
             String field,
             Operator operator,
-            List<String> values,
+            List<Object> values,
             Root<?> root,
             CriteriaBuilder criteriaBuilder,
             QueryPolicy policy,
             JoinRegistry joins) {
-        var resolved = pathResolver.resolve(root, field, joins);
+        var resolved = pathResolver.resolve(root, policy.resolveField(field), joins);
         validatePolicy(field, operator, resolved, policy);
         compatibility.validate(operator, resolved.javaType(), field);
         var typedValues = valueConverter.convertAll(values, resolved.javaType());

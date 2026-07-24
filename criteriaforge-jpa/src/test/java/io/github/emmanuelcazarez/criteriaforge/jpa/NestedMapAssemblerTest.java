@@ -3,6 +3,7 @@ package io.github.emmanuelcazarez.criteriaforge.jpa;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.github.emmanuelcazarez.criteriaforge.core.ProjectionField;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
@@ -16,7 +17,11 @@ class NestedMapAssemblerTest {
     @Test
     void assemblesNestedMapsWithoutDroppingSiblingFields() {
         var row = assembler.assemble(
-            List.of("id", "customer.name", "customer.country", "total"),
+            List.of(
+                ProjectionField.of("id"),
+                ProjectionField.of("customer.name"),
+                ProjectionField.of("customer.country"),
+                ProjectionField.of("total")),
             List.of(7L, "Ana", "MX", new BigDecimal("125.00")));
 
         assertThat(row)
@@ -30,7 +35,9 @@ class NestedMapAssemblerTest {
     @Test
     void keepsNullLeafValuesAndReturnsDeeplyImmutableMaps() {
         var row = assembler.assemble(
-            List.of("customer.name", "customer.country"),
+            List.of(
+                ProjectionField.of("customer.name"),
+                ProjectionField.of("customer.country")),
             Arrays.asList(null, "MX"));
 
         var customer = (Map<String, Object>) row.get("customer");
@@ -43,11 +50,27 @@ class NestedMapAssemblerTest {
 
     @Test
     void rejectsMismatchedColumnsAndPathCollisions() {
-        assertThatThrownBy(() -> assembler.assemble(List.of("id"), List.of()))
+        assertThatThrownBy(() -> assembler.assemble(
+            List.of(ProjectionField.of("id")), List.of()))
             .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> assembler.assemble(
-            List.of("customer", "customer.name"),
+            List.of(
+                ProjectionField.of("customer"),
+                ProjectionField.of("customer.name")),
             List.of("raw", "Ana")))
             .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void usesPerRequestOutputAliasesWithoutChangingTheSelectedSource() {
+        var row = assembler.assemble(
+            List.of(
+                ProjectionField.aliased("customer.name", "buyer.name"),
+                ProjectionField.aliased("total", "orderTotal")),
+            List.of("Ana", new BigDecimal("125.00")));
+
+        assertThat((Map<String, Object>) row.get("buyer"))
+            .containsEntry("name", "Ana");
+        assertThat(row).containsEntry("orderTotal", new BigDecimal("125.00"));
     }
 }

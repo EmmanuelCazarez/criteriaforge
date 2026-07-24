@@ -15,14 +15,21 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Converts transport string values into types resolved from the JPA metamodel. */
+/** Converts filter values into types resolved from the JPA metamodel. */
 final class JpaValueConverter {
 
-    public Object convert(String raw, Class<?> targetType) {
+    public Object convert(Object raw, Class<?> targetType) {
         Objects.requireNonNull(raw, "raw value must not be null");
         Objects.requireNonNull(targetType, "target type must not be null");
+        var boxedTargetType = boxed(targetType);
+        if (boxedTargetType.isInstance(raw)) {
+            return raw;
+        }
+        if (!(raw instanceof String text)) {
+            throw conversionFailure(targetType, null);
+        }
         try {
-            return convertKnownType(raw, boxed(targetType));
+            return convertKnownType(text, boxedTargetType);
         } catch (QueryValidationException exception) {
             throw exception;
         } catch (RuntimeException exception) {
@@ -30,7 +37,7 @@ final class JpaValueConverter {
         }
     }
 
-    public List<?> convertAll(List<String> rawValues, Class<?> targetType) {
+    public List<?> convertAll(List<Object> rawValues, Class<?> targetType) {
         Objects.requireNonNull(rawValues, "raw values must not be null");
         return rawValues.stream().map(raw -> convert(raw, targetType)).toList();
     }

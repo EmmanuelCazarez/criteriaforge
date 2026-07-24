@@ -1,22 +1,65 @@
 # Security and query policy
 
-A dynamic-query endpoint makes field names, operators, joins, and result sizes part of your public API. CriteriaForge validates that surface, but it does not decide whether the caller is authorized to read an entity or row. Apply authentication, tenant scoping, ownership checks, and use-case rules before executing a query.
+A dynamic-query endpoint makes field names, operators, joins, and result sizes
+part of a public surface. CriteriaForge validates that surface, but it does not
+authorize callers or decide which rows they may access. Authentication, tenant
+or ownership restrictions, soft-delete rules, and use-case decisions remain
+application responsibilities.
 
-## Safe defaults
+## Register every exposed entity
 
-The default `QueryPolicy`:
+Spring Boot auto-configuration is fail-closed. It creates the query engine, but
+an entity cannot be queried until the application registers exactly one policy:
 
-- permits persistent root scalar fields unless hidden;
-- disables relationship traversal;
-- caps a page at 100 rows;
-- caps a query at 25 conditions;
-- caps relationship depth at 2.
+```java
+@Bean
+QueryPolicyRegistration orderQueryPolicy() {
+    var policy = QueryPolicy.builder()
+        .allowFields("id", "reference", "status")
+        .alias("amount", "total")
+        .alias("customerName", "customer.name")
+        .allowOperators("amount", Operator.EQ, Operator.GTE, Operator.LTE)
+        .relationshipTraversal(true)
+        .maxDepth(1)
+        .maxPageSize(50)
+        .maxConditions(12)
+        .build();
 
-Unknown paths, non-persistent properties, incompatible operators, conversion failures, and excessive complexity fail before SQL is executed.
+    return QueryPolicyRegistration.forEntity(Order.class, policy);
+}
+```
+
+No registration produces `QUERY_POLICY_NOT_FOUND`. Two registrations for the
+same entity fail application startup. There is no global fallback policy that
+accidentally exposes a newly queried entity.
+
+Public aliases are resolved before JPA metadata access, but policy errors refer
+to the public name. In the example, callers use `amount` instead of `total`.
+Aliases are valid for filtering, sorting, and projection; per-request projection
+aliases only change output shape.
+
+## Policy defaults
+
+Each `QueryPolicy` begins with these limits:
+
+- relationship traversal disabled;
+- maximum page size 100;
+- maximum 25 conditions;
+- maximum relationship depth 2.
+
+When no explicit allowlist is configured, persistent fields are eligible unless
+hidden. For a public endpoint, prefer an allowlist. Calling `alias(...)` adds the
+public name to an explicit allowlist; it does not make an alias-only policy
+silently restrict all other fields.
+
+Explicit denials override allowlists. An operator allowlist applies to its public
+field; fields without one retain the operators compatible with their resolved
+Java type.
 
 ## Hide sensitive fields
 
-`@QueryHidden` prevents filtering, sorting, or projecting a field:
+`@QueryHidden` prevents filtering, sorting, or projecting a persistent field,
+including through a public alias:
 
 ```java
 import io.github.emmanuelcazarez.criteriaforge.core.annotation.QueryHidden;
@@ -28,65 +71,44 @@ class Customer {
 }
 ```
 
-Do not rely on naming conventions such as `secret` or `password`. Mark every sensitive persistent field explicitly and add a policy test.
+Do not rely on names such as `secret` or `password`. Mark sensitive attributes
+and add policy tests.
 
-## Prefer allowlists for public APIs
+## Apply mandatory row restrictions in the application
 
-Supply a `QueryPolicyProvider` bean to replace the global default and resolve policy by entity:
+CriteriaForge intentionally has no generic query-scope abstraction. The
+application knows whether a tenant, ownership, region, soft-delete, or other
+mandatory condition is correct for a use case. Add those constraints before
+execution, expose a use-case-specific service, or enforce them with a database
+or persistence mechanism appropriate to the application.
 
-```java
-@Bean
-QueryPolicyProvider queryPolicyProvider() {
-    return entityType -> {
-        if (entityType == Order.class) {
-            return QueryPolicy.builder()
-                .allowFields("id", "reference", "status", "total", "customer.name")
-                .allowOperators("total", Operator.EQ, Operator.GTE, Operator.LTE)
-                .relationshipTraversal(true)
-                .maxDepth(1)
-                .maxPageSize(50)
-                .maxConditions(12)
-                .build();
-        }
-        return QueryPolicy.builder().allowFields("id").build();
-    };
-}
-```
+Never pass a caller-controlled entity class or policy registration into
+`QueryEngine.execute(...)`.
 
-Explicit denials override allowlists. An operator allowlist applies only to its configured field; fields without one retain type-compatible operators.
+## Test the boundary
 
-Global defaults can be configured when a custom resolver is unnecessary:
-
-```yaml
-criteriaforge:
-  query:
-    max-page-size: 50
-    max-conditions: 12
-    max-depth: 1
-    relationship-traversal: false
-```
-
-## Test the policy
-
-Use the assertion library already present in the consuming application:
+At minimum, verify:
 
 ```java
-assertThat(policy.maxPageSize()).isEqualTo(50);
-assertThat(policy.relationshipTraversal()).isFalse();
-assertThat(policy.isFieldAllowed("id")).isTrue();
 assertThat(policy.isFieldAllowed("reference")).isTrue();
-assertThat(policy.isFieldAllowed("status")).isTrue();
 assertThat(policy.isFieldAllowed("internalRiskScore")).isFalse();
+assertThat(policy.resolveField("amount")).isEqualTo("total");
+assertThat(policy.isOperatorAllowed("amount", Operator.GTE)).isTrue();
+assertThat(policy.isOperatorAllowed("amount", Operator.LIKE)).isFalse();
 ```
+
+Also integration-test unknown fields, hidden fields, relationship depth,
+oversized pages, excessive conditions, invalid conversions, and missing entity
+registrations. These failures occur before SQL execution.
 
 ## Operational guidance
 
-- Apply row-level access predicates in your application; a field allowlist is not row authorization.
 - Keep relationship traversal off unless an endpoint needs it.
-- Prefer smaller limits for internet-facing endpoints.
+- Use smaller query and parser limits for internet-facing endpoints.
 - Monitor validation failures and slow queries without logging raw secrets.
-- Map stable error codes to your API contract; do not expose stack traces, generated SQL, or database messages.
-- Review entity changes as API changes when root fields are discoverable.
+- Map stable error codes to the application's API contract.
+- Do not expose stack traces, generated SQL, or database messages.
+- Review entity and policy changes as public API changes.
 - Use database statement timeouts and resource limits as defense in depth.
 
 For vulnerability disclosure, follow [Security reporting](../SECURITY.md).

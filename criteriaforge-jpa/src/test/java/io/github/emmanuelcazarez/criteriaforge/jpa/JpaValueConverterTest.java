@@ -37,6 +37,14 @@ class JpaValueConverterTest {
     }
 
     @Test
+    void preservesValuesThatAlreadyMatchTheJpaType() {
+        var amount = new BigDecimal("125.50");
+
+        assertThat(converter.convert(amount, BigDecimal.class)).isSameAs(amount);
+        assertThat(converter.convert(State.PAID, State.class)).isSameAs(State.PAID);
+    }
+
+    @Test
     void rejectsInvalidValuesWithAStableError() {
         assertThatThrownBy(() -> converter.convert("not-a-number", BigDecimal.class))
             .isInstanceOfSatisfying(QueryValidationException.class, error -> {
