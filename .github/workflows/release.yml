@@ -66,6 +66,7 @@ jobs:
         run: |
           signing_home="$(mktemp -d)"
           chmod 700 "${signing_home}"
+          export GNUPGHOME="${signing_home}"
           echo "GNUPGHOME=${signing_home}" >> "${GITHUB_ENV}"
           printf '%s' "${GPG_PRIVATE_KEY}" | base64 --decode | gpg --batch --import
 
