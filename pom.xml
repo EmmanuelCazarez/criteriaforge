@@ -244,6 +244,9 @@
                         <extensions>true</extensions>
                         <configuration>
                             <publishingServerId>central</publishingServerId>
+                            <excludeArtifacts>
+                                <excludeArtifact>criteriaforge-example</excludeArtifact>
+                            </excludeArtifacts>
                             <autoPublish>false</autoPublish>
                             <waitUntil>validated</waitUntil>
                             <skipPublishing>${central.skipPublishing}</skipPublishing>
