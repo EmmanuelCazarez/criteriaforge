@@ -64,7 +64,7 @@ The development version remains `0.1.0-SNAPSHOT`. Before the release pull reques
 ./mvnw -B -ntp -Prelease -Dgpg.skip=true -Dcentral.skipPublishing=true clean verify
 ```
 
-The last command creates the main, source, and Javadoc artifacts without signing or contacting Central. Inspect the published module targets. The example is never deployed.
+The last command creates the main, source, and Javadoc artifacts without signing or contacting Central. Inspect the published module targets. The release profile explicitly excludes `criteriaforge-example` from the Central bundle.
 
 ## 6. Prepare version 0.1.0
 
