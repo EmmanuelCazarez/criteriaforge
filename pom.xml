@@ -54,7 +54,7 @@
         <spring-boot4.version>4.1.0</spring-boot4.version>
         <archunit.version>1.4.1</archunit.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
-        <jacoco.version>0.8.14</jacoco.version>
+        <jacoco.version>0.8.15</jacoco.version>
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
         <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
         <maven-failsafe-plugin.version>3.5.4</maven-failsafe-plugin.version>
