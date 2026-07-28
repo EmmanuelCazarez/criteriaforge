@@ -4,6 +4,10 @@ All notable changes to CriteriaForge are documented here. The format follows [Ke
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-28
+
+First public release.
+
 ### Added
 
 - Immutable transport-neutral query AST with nested `AND`, `OR`, and `NOT` expressions.
@@ -24,10 +28,6 @@ All notable changes to CriteriaForge are documented here. The format follows [Ke
   selections without leaking them into the returned projection map.
 - Empty sorting now represents a valid query without explicit ordering instead
   of raising an exception.
-
-## [0.1.0] - Unreleased
-
-First public release candidate.
 
 [Unreleased]: https://github.com/EmmanuelCazarez/criteriaforge/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/EmmanuelCazarez/criteriaforge/releases/tag/v0.1.0
