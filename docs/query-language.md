@@ -25,10 +25,15 @@ var query = QueryRequest.builder()
     .selectAs("customerName", "buyer.name")
     .selectAs("amount", "orderTotal")
     .where(filter)
-    .sort(SortSpec.desc("amount"))
-    .page(PageSpec.offset(0, 20))
+    .orderByDescending("amount")
+    .offset(0)
+    .limit(20)
     .build();
 ```
+
+Add `orderByAscending` and `orderByDescending` calls in priority order.
+`limit` defaults the offset to zero; an explicit `offset` must be accompanied
+by `limit`.
 
 Use `Filters.allOf(collection)`, `Filters.anyOf(collection)`, and
 `Filters.not(expression)` when expressions are collected dynamically.

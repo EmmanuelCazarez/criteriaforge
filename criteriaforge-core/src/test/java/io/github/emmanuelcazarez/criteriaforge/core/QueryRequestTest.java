@@ -2,6 +2,7 @@ package io.github.emmanuelcazarez.criteriaforge.core;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
@@ -18,8 +19,10 @@ class QueryRequestTest {
             .where(Filters.field("status").eq("PAID")
                 .and(Filters.field("total").gte("100.00")
                     .or(Filters.field("cancelledAt").isNull())))
-            .sort(SortSpec.desc("createdAt"))
-            .page(PageSpec.offset(0, 20))
+            .orderByDescending("createdAt")
+            .orderByAscending("id")
+            .offset(5)
+            .limit(20)
             .build();
 
         fields.add("secret");
@@ -27,9 +30,13 @@ class QueryRequestTest {
         assertThat(query.fields()).containsExactly(
             ProjectionField.of("id"),
             ProjectionField.of("customer.name"));
-        assertThat(query.page()).contains(PageSpec.offset(0, 20));
+        assertThat(query.pagination()).contains(new Pagination(5, 20));
         assertThat(query.filter()).containsInstanceOf(FilterGroup.class);
-        assertThat(query.sorts()).containsExactly(SortSpec.desc("createdAt"));
+        assertThat(query.sorting().orders()).containsExactly(
+            new Sorting.Order("createdAt", SortDirection.DESC),
+            new Sorting.Order("id", SortDirection.ASC));
+        assertThat(query.sorting().orders())
+            .isUnmodifiable();
         assertThatThrownBy(() -> query.fields().add(ProjectionField.of("other")))
             .isInstanceOf(UnsupportedOperationException.class);
     }
@@ -46,9 +53,32 @@ class QueryRequestTest {
     }
 
     @Test
-    void rejectsInvalidPagesAndDuplicateProjectionFields() {
-        assertThatIllegalArgumentException().isThrownBy(() -> PageSpec.offset(-1, 20));
-        assertThatIllegalArgumentException().isThrownBy(() -> PageSpec.offset(0, 0));
+    void validatesPaginationAndDefaultsItsOffsetToZero() {
+        var query = QueryRequest.builder()
+            .limit(20)
+            .build();
+
+        assertThat(query.pagination()).contains(new Pagination(0, 20));
+        assertThatIllegalArgumentException().isThrownBy(
+            () -> new Pagination(-1, 20));
+        assertThatIllegalArgumentException().isThrownBy(
+            () -> new Pagination(0, 0));
+        assertThatIllegalStateException().isThrownBy(
+            () -> QueryRequest.builder().offset(10).build())
+            .withMessage("limit must be configured when offset is configured");
+    }
+
+    @Test
+    void representsMissingOrderByAsEmptySorting() {
+        var emptySorting = new Sorting(List.of());
+        var query = QueryRequest.builder().build();
+
+        assertThat(emptySorting.orders()).isEmpty();
+        assertThat(query.sorting()).isEqualTo(emptySorting);
+    }
+
+    @Test
+    void rejectsDuplicateProjectionFields() {
         assertThatIllegalArgumentException().isThrownBy(() -> QueryRequest.builder()
             .select("id", "id")
             .build());

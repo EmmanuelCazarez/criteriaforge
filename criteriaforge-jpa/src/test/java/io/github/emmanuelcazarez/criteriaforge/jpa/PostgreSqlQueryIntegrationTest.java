@@ -3,10 +3,8 @@ package io.github.emmanuelcazarez.criteriaforge.jpa;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.github.emmanuelcazarez.criteriaforge.core.Filters;
-import io.github.emmanuelcazarez.criteriaforge.core.PageSpec;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
-import io.github.emmanuelcazarez.criteriaforge.core.SortSpec;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.CustomerEntity;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.OrderEntity;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.OrderItemEntity;
@@ -94,7 +92,7 @@ class PostgreSqlQueryIntegrationTest {
                 .and(Filters.field("status").eq("paid"))
                 .and(Filters.field("total").eq("1234567890.1234"))
                 .and(Filters.field("createdAt").gte("2026-07-18T17:15:30Z")))
-            .page(PageSpec.offset(0, 10))
+            .limit(10)
             .build();
 
         var result = executor.findAll(OrderEntity.class, query);
@@ -111,8 +109,8 @@ class PostgreSqlQueryIntegrationTest {
     void keepsDistinctPaginationAndCountsAcrossPluralJoins() {
         var query = QueryRequest.builder()
             .where(Filters.field("items.product.name").eq("Widget"))
-            .sort(SortSpec.asc("reference"))
-            .page(PageSpec.offset(0, 1))
+            .orderByAscending("reference")
+            .limit(1)
             .build();
 
         var result = executor.findAll(OrderEntity.class, query);

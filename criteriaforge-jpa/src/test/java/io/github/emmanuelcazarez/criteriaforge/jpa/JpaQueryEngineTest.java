@@ -4,12 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.emmanuelcazarez.criteriaforge.core.Filters;
-import io.github.emmanuelcazarez.criteriaforge.core.PageSpec;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
-import io.github.emmanuelcazarez.criteriaforge.core.SortSpec;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.CustomerEntity;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.OrderEntity;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.OrderItemEntity;
@@ -55,8 +53,10 @@ class JpaQueryEngineTest {
     @Test
     void appliesDeclaredSortsAndOffsetPaginationWhileCountingAllMatches() {
         var query = QueryRequest.builder()
-            .sort(SortSpec.desc("total"), SortSpec.asc("reference"))
-            .page(PageSpec.offset(1, 2))
+            .orderByDescending("total")
+            .orderByAscending("reference")
+            .offset(1)
+            .limit(2)
             .build();
 
         var result = executor.findAll(OrderEntity.class, query);
@@ -72,7 +72,7 @@ class JpaQueryEngineTest {
     void defaultsToTheActualJpaIdentifierEvenWhenItIsNotNamedId() {
         var result = executor.findAll(
             OrderEntity.class,
-            QueryRequest.builder().page(PageSpec.offset(0, 10)).build());
+            QueryRequest.builder().limit(10).build());
 
         assertThat(result.content()).extracting(OrderEntity::getReference)
             .containsExactly("FIRST", "SECOND", "THIRD", "FOURTH");
@@ -97,7 +97,7 @@ class JpaQueryEngineTest {
 
         var query = QueryRequest.builder()
             .where(Filters.field("items.product.name").eq("Widget"))
-            .page(PageSpec.offset(0, 10))
+            .limit(10)
             .build();
 
         var result = executor.findAll(OrderEntity.class, query);
@@ -127,8 +127,8 @@ class JpaQueryEngineTest {
         var query = QueryRequest.builder()
             .select("reference", "total")
             .where(Filters.field("items.product.name").eq("Projected Widget"))
-            .sort(SortSpec.desc("total"))
-            .page(PageSpec.offset(0, 10))
+            .orderByDescending("total")
+            .limit(10)
             .build();
 
         var result = executor.findProjected(OrderEntity.class, query);
@@ -155,8 +155,8 @@ class JpaQueryEngineTest {
         var query = QueryRequest.builder()
             .selectAs("customer.name", "buyer.name")
             .selectAs("total", "orderTotal")
-            .sort(SortSpec.asc("reference"))
-            .page(PageSpec.offset(0, 1))
+            .orderByAscending("reference")
+            .limit(1)
             .build();
 
         var result = executor.findProjected(OrderEntity.class, query);
@@ -182,8 +182,8 @@ class JpaQueryEngineTest {
             .selectAs("buyerName", "buyer.name")
             .selectAs("amount", "orderTotal")
             .where(Filters.field("amount").gte(new BigDecimal("40.00")))
-            .sort(SortSpec.desc("amount"))
-            .page(PageSpec.offset(0, 1))
+            .orderByDescending("amount")
+            .limit(1)
             .build();
 
         var result = publicExecutor.findProjected(OrderEntity.class, query);

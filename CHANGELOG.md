@@ -4,6 +4,10 @@ All notable changes to CriteriaForge are documented here. The format follows [Ke
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-28
+
+First public release.
+
 ### Added
 
 - Immutable transport-neutral query AST with nested `AND`, `OR`, and `NOT` expressions.
@@ -16,15 +20,14 @@ All notable changes to CriteriaForge are documented here. The format follows [Ke
 - Readable HTTP filter expressions with boolean precedence and bounded parsing.
 - Stable per-entity public field mappings and per-request projection output aliases.
 - Explicit fail-closed per-entity policy registrations.
+- Fluent `Sorting` and `Pagination` query components with import-free builder methods.
 
 ### Fixed
 
 - PostgreSQL distinct projections over to-many joins now include hidden sort
   selections without leaking them into the returned projection map.
-
-## [0.1.0] - Unreleased
-
-First public release candidate.
+- Empty sorting now represents a valid query without explicit ordering instead
+  of raising an exception.
 
 [Unreleased]: https://github.com/EmmanuelCazarez/criteriaforge/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/EmmanuelCazarez/criteriaforge/releases/tag/v0.1.0

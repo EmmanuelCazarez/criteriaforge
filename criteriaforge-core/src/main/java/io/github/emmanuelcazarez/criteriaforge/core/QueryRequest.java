@@ -12,17 +12,14 @@ import java.util.Optional;
 public record QueryRequest(
         List<ProjectionField> fields,
         Optional<FilterExpression> filter,
-        List<SortSpec> sorts,
-        Optional<PageSpec> page) {
+        Sorting sorting,
+        Optional<Pagination> pagination) {
 
     public QueryRequest {
         fields = validateFields(fields);
         filter = Objects.requireNonNull(filter, "filter must not be null");
-        sorts = List.copyOf(Objects.requireNonNull(sorts, "sorts must not be null"));
-        if (sorts.stream().anyMatch(Objects::isNull)) {
-            throw new IllegalArgumentException("sorts must not contain null");
-        }
-        page = Objects.requireNonNull(page, "page must not be null");
+        sorting = Objects.requireNonNull(sorting, "sorting must not be null");
+        pagination = Objects.requireNonNull(pagination, "pagination must not be null");
     }
 
     public static Builder builder() {
@@ -64,9 +61,10 @@ public record QueryRequest(
     /** Mutable builder that creates an immutable {@link QueryRequest}. */
     public static final class Builder {
         private final List<ProjectionField> fields = new ArrayList<>();
-        private final List<SortSpec> sorts = new ArrayList<>();
+        private final List<Sorting.Order> orders = new ArrayList<>();
         private FilterExpression filter;
-        private PageSpec page;
+        private Integer offset;
+        private Integer limit;
 
         private Builder() {
         }
@@ -93,13 +91,26 @@ public record QueryRequest(
             return this;
         }
 
-        public Builder sort(SortSpec... sorts) {
-            this.sorts.addAll(Arrays.asList(sorts));
+        public Builder orderBy(String field, SortDirection direction) {
+            this.orders.add(new Sorting.Order(field, direction));
             return this;
         }
 
-        public Builder page(PageSpec page) {
-            this.page = Objects.requireNonNull(page, "page must not be null");
+        public Builder orderByAscending(String field) {
+            return orderBy(field, SortDirection.ASC);
+        }
+
+        public Builder orderByDescending(String field) {
+            return orderBy(field, SortDirection.DESC);
+        }
+
+        public Builder offset(int offset) {
+            this.offset = offset;
+            return this;
+        }
+
+        public Builder limit(int limit) {
+            this.limit = limit;
             return this;
         }
 
@@ -107,8 +118,19 @@ public record QueryRequest(
             return new QueryRequest(
                 fields,
                 Optional.ofNullable(filter),
-                sorts,
-                Optional.ofNullable(page));
+                new Sorting(orders),
+                pagination());
+        }
+
+        private Optional<Pagination> pagination() {
+            if (limit == null) {
+                if (offset != null) {
+                    throw new IllegalStateException(
+                        "limit must be configured when offset is configured");
+                }
+                return Optional.empty();
+            }
+            return Optional.of(new Pagination(offset == null ? 0 : offset, limit));
         }
     }
 }

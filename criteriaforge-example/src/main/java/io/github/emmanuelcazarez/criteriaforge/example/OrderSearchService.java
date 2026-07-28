@@ -2,10 +2,8 @@ package io.github.emmanuelcazarez.criteriaforge.example;
 
 import static io.github.emmanuelcazarez.criteriaforge.core.Filters.field;
 
-import io.github.emmanuelcazarez.criteriaforge.core.PageSpec;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryResult;
-import io.github.emmanuelcazarez.criteriaforge.core.SortSpec;
 import io.github.emmanuelcazarez.criteriaforge.example.domain.Order;
 import io.github.emmanuelcazarez.criteriaforge.example.domain.OrderStatus;
 import io.github.emmanuelcazarez.criteriaforge.jpa.QueryEngine;
@@ -32,8 +30,8 @@ public class OrderSearchService {
             .selectAs("buyerName", "buyer.name")
             .selectAs("amount", "orderTotal")
             .where(filter)
-            .sort(SortSpec.desc("amount"))
-            .page(PageSpec.offset(0, 20))
+            .orderByDescending("amount")
+            .limit(20)
             .build();
 
         return queryEngine.execute(Order.class, query);

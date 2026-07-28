@@ -22,7 +22,7 @@ class QueryPolicyTest {
 
     @Test
     void defaultPolicyRejectsOversizedPages() {
-        var query = QueryRequest.builder().page(PageSpec.offset(0, 101)).build();
+        var query = QueryRequest.builder().limit(101).build();
 
         assertThatThrownBy(() -> validator.validate(query, QueryPolicy.defaults()))
             .isInstanceOfSatisfying(QueryValidationException.class, error -> {

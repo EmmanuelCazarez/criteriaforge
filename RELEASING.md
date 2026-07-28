@@ -36,9 +36,10 @@ Keep the private export, passphrase, and revocation certificate in separate secu
 
 In Central Portal, open account settings and generate a user token. The token provides a username and password pair for Maven; it is not the GitHub password. Store both values immediately in a password manager.
 
-## 4. Configure GitHub secrets and approval
+## 4. Configure GitHub environment secrets and approval
 
-In the GitHub repository, create these Actions secrets exactly:
+Create a GitHub Actions environment named `maven-central`, require a maintainer
+review, and create these environment secrets exactly:
 
 | Secret | Value |
 | --- | --- |
@@ -47,7 +48,10 @@ In the GitHub repository, create these Actions secrets exactly:
 | `GPG_PRIVATE_KEY` | ASCII-armored private key, then base64-encoded as one value |
 | `GPG_PASSPHRASE` | Signing-key passphrase |
 
-Create a GitHub Actions environment named `maven-central`. Add required reviewers so the deployment job cannot start without manual approval. Do not put secret values in environment variables committed to the repository, workflow defaults, Maven POMs, issues, or logs.
+The Central token should expire and be rotated before its expiration date. Add
+required reviewers so the deployment job cannot start without manual approval.
+Do not put secret values in repository-level secrets, environment variables
+committed to the repository, workflow defaults, Maven POMs, issues, or logs.
 
 ## 5. Verify a candidate locally
 
