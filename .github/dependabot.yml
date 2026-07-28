@@ -6,6 +6,12 @@ updates:
       interval: weekly
     target-branch: dev
     open-pull-requests-limit: 5
+    ignore:
+      # Spring Boot 3 remains the library baseline. Boot 4 compatibility is
+      # exercised explicitly by CI instead of changing the baseline automatically.
+      - dependency-name: "org.springframework.boot:*"
+        update-types:
+          - "version-update:semver-major"
   - package-ecosystem: github-actions
     directory: /
     schedule:
