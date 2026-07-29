@@ -1,6 +1,6 @@
 # CriteriaForge Trunk, Release, and Repository Protection Design
 
-**Status:** Pending written-spec review
+**Status:** Approved
 **Date:** 2026-07-29
 
 ## Context
@@ -242,12 +242,14 @@ created.
 
 ## Release tags
 
-An active tag ruleset named `protect-release-tags` targets `v*` and:
+Two active tag rulesets target `v*` because GitHub bypass actors apply to an
+entire ruleset rather than to one rule inside it:
 
-- restricts tag creation to repository administrators;
-- blocks tag updates;
-- blocks tag deletion;
-- preserves `v0.1.0` unchanged.
+- `restrict-release-tag-creation` restricts creation to repository
+  administrators;
+- `protect-release-tags` has no bypass actor and blocks tag updates and
+  deletion;
+- together they preserve `v0.1.0` unchanged.
 
 Release tags are annotated and signed. The tag name uses `vX.Y.Z`, while the
 Maven version uses `X.Y.Z`.
@@ -357,7 +359,8 @@ Migration is performed without changing published release identity:
 8. Create required workflows and allow each future required status name to
    report successfully before activating the corresponding ruleset requirement.
 9. Configure squash-only merging and automatic source-branch deletion.
-10. Activate `protect-main` and `protect-release-tags`.
+10. Activate `protect-main`, `restrict-release-tag-creation`, and
+    `protect-release-tags`.
 11. Confirm no unique or open work depends on `dev`.
 12. Delete the remote `dev` branch and obsolete same-repository temporary
     branches.
@@ -375,8 +378,9 @@ history.
 - **Policy check fails:** correct the PR title or same-repository branch and
   rerun without bypass.
 - **Unsigned or unexpected tag:** Release stops before environment approval or
-  credential access. An invalid unpublished tag is handled administratively;
-  an existing published tag is never moved.
+  credential access. Deleting an invalid unpublished tag requires an explicit
+  temporary administrative change to the immutable-tag ruleset followed by
+  immediate restoration; an existing published tag is never moved or deleted.
 - **Release verification fails:** no Central upload occurs.
 - **Central validation fails:** drop the deployment, correct the source through
   a new pull request, and use a new release version when required.
