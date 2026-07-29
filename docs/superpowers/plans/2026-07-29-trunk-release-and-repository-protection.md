@@ -643,7 +643,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref_name || inputs.version }}
+  group: release-${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
   cancel-in-progress: false
 
 env:
