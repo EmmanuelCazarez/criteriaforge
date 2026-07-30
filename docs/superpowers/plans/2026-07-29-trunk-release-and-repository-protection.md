@@ -432,8 +432,9 @@ git commit -m "ci: protect main with full verification"
 - Modify: `.github/workflows/release.yml`
 
 **Interfaces:**
-- Consumes: release tag, public key, pinned fingerprint `27CE82768E118D3F80256BB6E60E5A6A6709E150`, `origin/main`, and Maven project version.
+- Consumes: one event-derived release tag, trusted public validator/key material from protected `main`, pinned fingerprint `27CE82768E118D3F80256BB6E60E5A6A6709E150`, the immutable candidate checkout with `origin/main`, and Maven project version.
 - Produces: candidate outputs `tag`, `version`, and `commit`; publication secrets remain inaccessible until all verification jobs pass.
+- Keeps Git tags as `vX.Y.Z`, Maven versions as `X.Y.Z`, and concurrency groups as `release-vX.Y.Z`.
 
 - [ ] **Step 1: Export and inspect the public release key**
 
@@ -480,11 +481,22 @@ expect_fail() {
 }
 
 cleanup() {
+  local cleanup_status=0
+  local command_status
+
   if git -C "${repository_root}" worktree list --porcelain |
     grep -Fxq "worktree ${candidate_worktree}"; then
-    git -C "${repository_root}" worktree remove --force "${candidate_worktree}"
+    git -C "${repository_root}" worktree remove --force "${candidate_worktree}" ||
+      cleanup_status="$?"
   fi
-  rm -rf "${test_root}"
+  rm -rf "${test_root}" || {
+    command_status="$?"
+    if [[ "${cleanup_status}" -eq 0 ]]; then
+      cleanup_status="${command_status}"
+    fi
+  }
+
+  return "${cleanup_status}"
 }
 trap cleanup EXIT
 
@@ -615,11 +627,14 @@ Run:
 
 Expected:
 
+- parsed workflow assertions require the same event-derived `vX.Y.Z` tag in concurrency and candidate validation;
+- parsed workflow assertions require separate `trusted-tools` and `candidate` checkouts;
+- the historical candidate is verified with the trusted validator and public key even though it contains neither file;
 - malformed and missing tags are rejected;
 - a mismatched signing fingerprint is rejected;
 - the detached signed `v0.1.0` candidate passes with Maven version `0.1.0`;
 - the final line is `All release candidate tests passed.`;
-- the temporary worktree is removed by the exit trap.
+- the exit trap attempts both worktree and temporary-directory removal while retaining any cleanup failure.
 
 - [ ] **Step 5: Replace release triggers and separate candidate verification**
 
@@ -647,6 +662,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
   RELEASE_SIGNING_FINGERPRINT: 27CE82768E118D3F80256BB6E60E5A6A6709E150
 ```
 
@@ -663,25 +679,32 @@ Add the unprivileged candidate job:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}
+          ref: main
+          path: trusted-tools
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
+          path: candidate
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
           cache: maven
       - name: Fetch main without rewriting tags
-        run: git fetch --no-tags origin main:refs/remotes/origin/main
+        run: git -C candidate fetch --no-tags origin main:refs/remotes/origin/main
       - name: Validate signed release candidate
         id: validate
-        env:
-          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}
-        run: >-
-          .github/scripts/validate-release-candidate.sh
-          "${RELEASE_TAG}"
-          "${RELEASE_SIGNING_FINGERPRINT}"
-          .github/release-signing-key.asc
-          >> "${GITHUB_OUTPUT}"
+        run: |
+          cd candidate
+          ../trusted-tools/.github/scripts/validate-release-candidate.sh \
+            "${RELEASE_TAG}" \
+            "${RELEASE_SIGNING_FINGERPRINT}" \
+            ../trusted-tools/.github/release-signing-key.asc \
+            >> "${GITHUB_OUTPUT}"
 ```
+
+For tag pushes, `RELEASE_TAG` is `github.ref_name`; for `workflow_dispatch`, it is always `v${inputs.version}`, even when the dispatch itself is launched from a tag. The same event-derived expression forms concurrency `release-vX.Y.Z`, selects the immutable candidate, and is passed to validation. Protected `main` supplies the validator and public key through `trusted-tools`; validation runs from the separate `candidate` working directory, whose exact commit becomes the matrix and publish output.
 
 The workflow has no `release: published` trigger. A merge into `main` runs CI but does not publish; pushing a valid signed tag starts the release.
 

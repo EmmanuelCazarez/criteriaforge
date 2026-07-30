@@ -19,6 +19,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
   RELEASE_SIGNING_FINGERPRINT: 27CE82768E118D3F80256BB6E60E5A6A6709E150
 
 jobs:
@@ -32,24 +33,29 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-          ref: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}
+          ref: main
+          path: trusted-tools
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
+          path: candidate
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
           cache: maven
       - name: Fetch main without rewriting tags
-        run: git fetch --no-tags origin main:refs/remotes/origin/main
+        run: git -C candidate fetch --no-tags origin main:refs/remotes/origin/main
       - name: Validate signed release candidate
         id: validate
-        env:
-          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', inputs.version) }}
-        run: >-
-          .github/scripts/validate-release-candidate.sh
-          "${RELEASE_TAG}"
-          "${RELEASE_SIGNING_FINGERPRINT}"
-          .github/release-signing-key.asc
-          >> "${GITHUB_OUTPUT}"
+        run: |
+          cd candidate
+          ../trusted-tools/.github/scripts/validate-release-candidate.sh \
+            "${RELEASE_TAG}" \
+            "${RELEASE_SIGNING_FINGERPRINT}" \
+            ../trusted-tools/.github/release-signing-key.asc \
+            >> "${GITHUB_OUTPUT}"
 
   build-java17-boot3:
     needs: candidate
