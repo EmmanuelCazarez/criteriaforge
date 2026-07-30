@@ -4,8 +4,9 @@ This guide prepares every CriteriaForge release through the Maven Central
 Publisher Portal. Complete account and credential steps once; repeat the
 release preparation and publication steps for every version.
 
-Publishing is intentionally two-stage: the Release workflow uploads and waits
-for Central validation, then a maintainer reviews and manually publishes.
+Publishing is intentionally two-stage: the Release workflow sets
+`autoPublish=false`, uploads, and waits for Central validation; then a
+maintainer reviews and manually publishes.
 Once Maven Central publishes a coordinate, it cannot be replaced, edited, or
 deleted. Fixes require a new version.
 
@@ -81,7 +82,7 @@ committed to the repository, workflow defaults, Maven POMs, issues, or logs.
 7. Create annotated signed tag `vX.Y.Z` on the exact successful `main` commit and verify it locally:
 
    ```text
-   git tag -s -a vX.Y.Z -m "Release vX.Y.Z" MAIN_COMMIT
+   git tag -s vX.Y.Z -m "Release vX.Y.Z" MAIN_COMMIT
    git tag --verify vX.Y.Z
    git rev-parse vX.Y.Z^{commit}
    ```
@@ -93,8 +94,8 @@ committed to the repository, workflow defaults, Maven POMs, issues, or logs.
 
 ## Recovery
 
-- **Validation failed:** read Central's per-file messages, drop the deployment, add a regression check, and upload a corrected candidate.
-- **Workflow failed before upload:** do not move or replace the signed tag. A manual recovery run may repeat verification only for that existing tag. If source or release metadata must change, prepare and merge a new release candidate and use a new version and signed tag.
+- **Validation failed:** read Central's per-file messages, drop the deployment, and add a regression check. A manual dispatch may rerun only the unchanged existing signed tag. If source or release metadata must change, prepare and merge a new candidate with a new version and signed tag; never reuse the failed tag or version.
+- **Workflow failed before upload:** do not move or replace the signed tag. A manual recovery run may repeat verification only for the unchanged existing signed tag. If source or release metadata must change, prepare and merge a new candidate with a new version and signed tag.
 - **Signing key exposed:** revoke it, remove GitHub secrets, publish the revocation, create a new key, and rotate the workflow secrets before another release.
 - **Central token exposed:** revoke it in Central immediately and replace both token secrets.
 - **Wrong artifact already published:** publication cannot be reversed. Publish a corrected patch version and document the affected version.
