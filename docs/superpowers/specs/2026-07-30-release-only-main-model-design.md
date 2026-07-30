@@ -18,6 +18,12 @@ governance correction may be squash-merged to install this model. After that
 correction, every new `main` commit must represent exactly one official
 release.
 
+That correction uses a one-time bootstrap exception: a same-repository
+`dev`-to-`main` pull request titled exactly
+`ci: adopt release-only main governance` is accepted only while the pull
+request base SHA is `cab27f008b664df78ac83247f3ad27cf160fa72e`. Once `main`
+moves, the exception becomes unusable without any follow-up configuration.
+
 ## Invariants
 
 1. The signed `v0.1.0` tag remains unchanged at
@@ -83,6 +89,17 @@ prefix.
 - No feature, fix, documentation, Dependabot, or hotfix branch may target
   `main` directly. Urgent work still flows through `dev`.
 
+The one-time governance bootstrap is the sole exception to the release-title
+and release-metadata requirements. It passes `pr-policy` only when the base is
+`main`, the source repository is CriteriaForge itself, the source branch is
+exactly `dev`, the title is exactly
+`ci: adopt release-only main governance`, and the pull request base SHA is
+`cab27f008b664df78ac83247f3ad27cf160fa72e`. CI skips Java setup and release
+metadata validation only for that exact title; the policy validator still
+rejects the title unless every bootstrap field matches. Normal release pull
+requests retain the exact `chore(release): release X.Y.Z` title and stable
+Maven/changelog metadata checks.
+
 ## Post-release `dev` lifecycle
 
 A squash merge does not make the resulting `main` commit an ancestor of the
@@ -137,11 +154,15 @@ The existing compatibility and quality work remains:
 - CodeQL Java analysis.
 
 CI runs for pull requests targeting `dev` or `main`, and for pushes to both
-permanent branches. The existing exact check names remain stable.
+permanent branches. Pull request title edits rerun CI so title policy cannot
+retain stale approval. The existing exact check names remain stable.
 
 `protect-main` continues to block direct pushes, deletion, force pushes, and
 non-squash merges. Its PR policy is supplemented by the source-branch and
-release-version workflow check.
+release-version workflow check. The policy receives the pull request base SHA
+from GitHub and pins the one-time governance bootstrap to the pre-migration
+`main` commit, so the exception expires automatically when that branch
+advances.
 
 A new `protect-dev` ruleset requires current pull requests, linear history,
 resolved review conversations, and the required checks. It blocks direct and
@@ -168,15 +189,18 @@ signed `vX.Y.Z` tag on that exact `main` commit.
 1. Preserve the current `main` history and signed `v0.1.0` tag.
 2. Prepare one final governance correction PR containing branch policies,
    CI triggers, Dependabot target, ruleset source of truth, and documentation.
-3. Squash-merge that correction to `main` as the final legacy administrative
-   commit.
-4. Recreate `dev` from the corrected `main` tip.
-5. Apply and verify live `protect-main` and `protect-dev` rulesets.
-6. Retarget or recreate Dependabot PRs against `dev`.
-7. Recreate the five-file record cleanup on a `refactor/` branch from `dev`,
+3. After freshly proving that remote `dev` has no unique intended work or
+   dependent pull request, reset it with an exact force-with-lease to the
+   verified governance tip; never publish a remote migration/docs branch.
+4. Open the pinned one-time `dev`-to-`main` governance PR and squash-merge it as
+   the final legacy administrative commit.
+5. Recreate `dev` from the corrected `main` tip.
+6. Apply and verify live `protect-main` and `protect-dev` rulesets.
+7. Retarget or recreate Dependabot PRs against `dev`.
+8. Recreate the five-file record cleanup on a `refactor/` branch from `dev`,
    verify it, squash-merge it to `dev`, and delete both temporary source
    branches when safe.
-8. Verify the final remote inventory: `main`, `dev`, and branches belonging
+9. Verify the final remote inventory: `main`, `dev`, and branches belonging
    only to active pull requests.
 
 ## Retention audit of the prior migration

@@ -4,7 +4,7 @@
 
 **Goal:** Convert CriteriaForge from the temporary trunk-based workflow to a release-ledger model in which `dev` collects reviewed integration work and every future commit added to `main` represents one official Maven Central release.
 
-**Architecture:** Keep the existing signed `v0.1.0` tag and 38-commit `main` history intact, merge one final governance correction as the explicit legacy exception, then recreate `dev` from that corrected baseline. CI enforces source-branch and metadata contracts: approved short-lived branches squash into `dev`; only `dev` can open an exact release PR to `main`; the release squash is the single official release commit; and `dev` is recreated from `main` after each release to eliminate squash ancestry divergence.
+**Architecture:** Keep the existing signed `v0.1.0` tag and 38-commit `main` history intact, merge one final governance correction as the explicit legacy exception, then recreate `dev` from that corrected baseline. The bootstrap is an exact same-repository `dev`-to-`main` tuple pinned to the pre-migration `main` SHA, so it expires automatically when `main` moves. CI otherwise enforces source-branch and stable release-metadata contracts: approved short-lived branches squash into `dev`; only `dev` can open an exact release PR to `main`; the release squash is the single official release commit; and `dev` is recreated from `main` after each release to eliminate squash ancestry divergence.
 
 **Tech Stack:** Git/GitHub, GitHub Actions, GitHub rulesets and repository settings, POSIX shell, Maven Wrapper, Java 17, Spring Boot 3 and 4, PostgreSQL, CodeQL, Dependabot, Maven Central, GPG-signed Git tags.
 
@@ -13,6 +13,7 @@
 - Preserve the existing `main` history. Do not rewrite or force-push `main`.
 - Preserve signed tag `v0.1.0`, its signature, and its target commit.
 - Treat the governance PR described below as the final non-release commit allowed on `main`.
+- Permit that one-time PR only for the exact title, repositories, branches, and base SHA recorded in Task 7; never broaden or refresh the pinned exception.
 - After that governance merge, only a squash-merged `dev` release PR may update `main`.
 - Keep `main` as the default branch and `dev` as the permanent between-release integration branch.
 - Use squash merge for every accepted PR. Keep merge commits and rebase merges disabled.
@@ -138,19 +139,21 @@ Expected: one documentation-only commit on `docs/release-only-main-model`.
 
 - [ ] **Step 1: Add failing tests for the approved branch matrix**
 
-Extend the test harness to pass `base_ref` as a fifth argument.
+Extend the test harness to pass `base_ref` and `base_sha` as the fifth and sixth arguments.
 
 Add passing cases:
 
 - `feature/*`, `fix/*`, `docs/*`, `refactor/*`, `test/*`, `build/*`, `ci/*`, `chore/*`, `release/*`, and `dependabot/*` from the same repository to `dev`, with Conventional Commit PR titles.
 - A fork branch to `dev`, with a Conventional Commit PR title.
 - Exact same-repository `dev` to `main` with `chore(release): release 0.2.0`.
+- The exact one-time same-repository `dev`-to-`main` governance title against base SHA `cab27f008b664df78ac83247f3ad27cf160fa72e`.
 
 Add failing cases:
 
 - Any branch except exact `dev` targeting `main`.
 - `dev` from a fork targeting `main`.
 - `dev` to `main` with a non-release title.
+- The governance title with any different base SHA.
 - A release title with `-SNAPSHOT`, missing patch number, leading-zero numeric parts, or extra text.
 - A same-repository branch with an unapproved prefix targeting `dev`.
 - An unsupported base branch.
@@ -161,14 +164,14 @@ Run:
 bash .github/scripts/validate-pr-policy-test.sh
 ```
 
-Expected: new tests fail against the current four-argument, trunk-oriented validator.
+Expected: the new bootstrap passing case fails against the pre-bootstrap validator.
 
 - [ ] **Step 2: Implement base-aware policy validation**
 
 Change the validator contract to:
 
 ```text
-validate-pr-policy.sh TITLE HEAD_REF HEAD_REPOSITORY BASE_REPOSITORY BASE_REF
+validate-pr-policy.sh TITLE HEAD_REF HEAD_REPOSITORY BASE_REPOSITORY BASE_REF BASE_SHA
 ```
 
 Implement these branches:
@@ -182,7 +185,10 @@ base=dev:
 base=main:
   require same repository
   require exact head_ref=dev
-  require exact title pattern chore(release): release X.Y.Z
+  accept exact title pattern chore(release): release X.Y.Z
+  or accept the exact one-time title ci: adopt release-only main governance
+    only when base_sha=cab27f008b664df78ac83247f3ad27cf160fa72e
+  reject every other title or bootstrap base SHA
 
 other base:
   reject
@@ -205,12 +211,15 @@ Expected: all branch and title cases pass.
 - [ ] **Step 4: Perform direct negative checks**
 
 ```bash
-if bash .github/scripts/validate-pr-policy.sh "ci: bypass" "ci/bypass" "EmmanuelCazarez/criteriaforge" "EmmanuelCazarez/criteriaforge" "main"; then exit 1; fi
-if bash .github/scripts/validate-pr-policy.sh "chore(release): release 0.2.0" "dev" "someone/fork" "EmmanuelCazarez/criteriaforge" "main"; then exit 1; fi
-bash .github/scripts/validate-pr-policy.sh "chore(release): release 0.2.0" "dev" "EmmanuelCazarez/criteriaforge" "EmmanuelCazarez/criteriaforge" "main"
+bootstrap_sha=cab27f008b664df78ac83247f3ad27cf160fa72e
+if bash .github/scripts/validate-pr-policy.sh "ci: bypass" "ci/bypass" "EmmanuelCazarez/criteriaforge" "EmmanuelCazarez/criteriaforge" "main" "${bootstrap_sha}"; then exit 1; fi
+if bash .github/scripts/validate-pr-policy.sh "chore(release): release 0.2.0" "dev" "someone/fork" "EmmanuelCazarez/criteriaforge" "main" "${bootstrap_sha}"; then exit 1; fi
+if bash .github/scripts/validate-pr-policy.sh "ci: adopt release-only main governance" "dev" "EmmanuelCazarez/criteriaforge" "EmmanuelCazarez/criteriaforge" "main" "0000000000000000000000000000000000000000"; then exit 1; fi
+bash .github/scripts/validate-pr-policy.sh "chore(release): release 0.2.0" "dev" "EmmanuelCazarez/criteriaforge" "EmmanuelCazarez/criteriaforge" "main" "${bootstrap_sha}"
+bash .github/scripts/validate-pr-policy.sh "ci: adopt release-only main governance" "dev" "EmmanuelCazarez/criteriaforge" "EmmanuelCazarez/criteriaforge" "main" "${bootstrap_sha}"
 ```
 
-Expected: the first two commands are rejected; the third succeeds.
+Expected: the first three commands are rejected; the final two succeed.
 
 - [ ] **Step 5: Commit the policy validator**
 
@@ -277,14 +286,15 @@ Expected: both test suites pass.
 Update `.github/workflows/ci.yml` so:
 
 - Pull requests and pushes to both `dev` and `main` run CI.
-- The existing `pr-policy` job passes `${{ github.base_ref }}` as the fifth policy argument.
-- For PRs targeting `main`, Java 17 is available and the root Maven version is resolved using the wrapper:
+- Pull request `edited` activity reruns CI so a title change re-evaluates policy.
+- The existing `pr-policy` job passes `${{ github.base_ref }}` and `${{ github.event.pull_request.base.sha }}` as the fifth and sixth policy arguments.
+- For PRs targeting `main` other than the exact governance title, Java 17 is available and the root Maven version is resolved using the wrapper:
 
 ```bash
 ./mvnw -q help:evaluate -Dexpression=project.version -DforceStdout
 ```
 
-- The main-targeting PR then invokes `validate-release-pr.sh` with the PR title, resolved project version, and `CHANGELOG.md`.
+- The main-targeting PR then invokes `validate-release-pr.sh` with the PR title, resolved project version, and `CHANGELOG.md`. Only the exact governance title skips these release-metadata steps; `pr-policy` still rejects that title unless the complete bootstrap tuple matches.
 - The job context remains exactly `pr-policy`.
 
 - [ ] **Step 5: Lint and inspect the workflow**
@@ -300,7 +310,7 @@ Expected:
 
 - YAML parses.
 - Both permanent branches are covered.
-- Release metadata validation is limited to PRs targeting `main`.
+- Release metadata validation runs for `main` pull requests except the exact one-time governance title.
 
 - [ ] **Step 6: Commit release PR validation**
 
@@ -584,11 +594,13 @@ Resolve every high-confidence issue and rerun affected checks.
 
 **Remote-state task:** This task changes GitHub state. Execute only after Task 6 is green and the user has authorized execution of this implementation plan.
 
-- [ ] **Step 1: Re-fetch and revalidate the base**
+- [ ] **Step 1: Re-fetch and revalidate the pinned bootstrap base**
 
 ```bash
+bootstrap_base_sha=cab27f008b664df78ac83247f3ad27cf160fa72e
 git fetch --prune origin
 git status --short --branch
+test "$(git rev-parse origin/main)" = "${bootstrap_base_sha}"
 git rev-list --left-right --count origin/main...HEAD
 git merge-base --is-ancestor origin/main HEAD
 ```
@@ -596,23 +608,55 @@ git merge-base --is-ancestor origin/main HEAD
 Expected:
 
 - Worktree is clean.
-- The implementation branch contains latest `origin/main`.
-- If `main` moved, rebase safely and rerun Task 6.
+- The reviewed governance implementation contains the pinned `origin/main`.
+- `origin/main` still identifies exactly `cab27f008b664df78ac83247f3ad27cf160fa72e`.
+- If `main` moved, stop. The bootstrap exception is intentionally unusable; do not rebase, refresh, or broaden the pinned exception without a new human ruling.
 
-- [ ] **Step 2: Push the approved branch**
+- [ ] **Step 2: Prove that resetting remote `dev` is still safe**
 
 ```bash
-git push -u origin docs/release-only-main-model
+gh pr list --state open --base dev --json number,title,headRefName,url
+gh pr list --state open --head dev --json number,title,baseRefName,url
+git log --left-right --cherry-pick --oneline origin/main...origin/dev
+git diff --stat origin/main..origin/dev
+git diff --stat origin/dev..origin/main
+git rev-parse origin/dev
+git rev-parse HEAD
 ```
 
-- [ ] **Step 3: Open the final legacy governance PR**
+Expected:
+
+- No pull request depends on the old remote `dev`.
+- No unique intended change remains only on old remote `dev`.
+- The exact old remote `dev` SHA and reviewed governance HEAD are recorded.
+- If any condition is unclear, stop without changing remote state.
+
+- [ ] **Step 3: Reset only remote `dev` to the verified governance tip**
+
+Re-fetch, recapture the expected old remote SHA, and use an exact force-with-lease. Never push `docs/release-only-main-model` or any other migration/docs branch remotely.
+
+```bash
+git fetch --prune origin
+old_dev_sha="$(git rev-parse refs/remotes/origin/dev)"
+governance_sha="$(git rev-parse HEAD)"
+test "$(git rev-parse origin/main)" = cab27f008b664df78ac83247f3ad27cf160fa72e
+git push --force-with-lease="refs/heads/dev:${old_dev_sha}" origin HEAD:refs/heads/dev
+git fetch --prune origin
+test "$(git rev-parse origin/dev)" = "${governance_sha}"
+test "$(git rev-parse origin/main)" = cab27f008b664df78ac83247f3ad27cf160fa72e
+```
+
+Expected: only remote `dev` changes, and it identifies the exact reviewed governance commit. A lease failure is a stop condition; do not retry with an unqualified force push.
+
+- [ ] **Step 4: Open the final legacy governance PR**
 
 Create a PR:
 
 ```text
 base: main
-head: docs/release-only-main-model
+head: dev (same repository)
 title: ci: adopt release-only main governance
+pull request base SHA: cab27f008b664df78ac83247f3ad27cf160fa72e
 ```
 
 The body must clearly state:
@@ -623,7 +667,9 @@ The body must clearly state:
 - no Maven release occurs in this PR
 - the implementation plan and verification evidence
 
-- [ ] **Step 4: Wait for exact required checks**
+The `pr-policy` job must receive the base SHA from the pull request event. Java setup and release-metadata validation skip only this exact governance title; any wrong repository, branch, title, base, or base SHA still fails policy.
+
+- [ ] **Step 5: Wait for exact required checks**
 
 ```bash
 gh pr checks <PR_NUMBER> --watch
@@ -639,22 +685,25 @@ Expected all pass:
 - `dependency-review`
 - `codeql-java`
 
-- [ ] **Step 5: Squash merge and verify auto-deletion**
+- [ ] **Step 6: Squash merge and verify auto-deletion**
 
 Use the GitHub squash merge operation. Do not merge locally and do not use rebase merge.
 
 Expected:
 
 - `main` advances by exactly one commit.
-- The PR source branch is automatically deleted.
+- The PR source branch `dev` is automatically deleted.
 - The resulting commit message is the governance PR title.
+- The bootstrap exception is now unusable because `main` no longer has the pinned base SHA.
 
-- [ ] **Step 6: Record the freeze baseline**
+- [ ] **Step 7: Record the freeze baseline**
 
 ```bash
 git fetch --prune origin
 git rev-list --count origin/main
 git log -1 --format='%H %s' origin/main
+test "$(git rev-parse origin/main)" != cab27f008b664df78ac83247f3ad27cf160fa72e
+git ls-remote --heads origin dev
 git ls-remote --heads origin docs/release-only-main-model
 git tag -v v0.1.0
 ```
@@ -663,10 +712,11 @@ Expected:
 
 - `main` now has 39 commits if no concurrent commit appeared.
 - The governance commit hash becomes the invariant baseline.
-- The source branch is absent remotely.
+- `dev` is absent remotely until Task 8 recreates it from the freeze baseline.
+- No remote `docs/release-only-main-model` branch exists.
 - `v0.1.0` still verifies unchanged.
 
-If the count is not 39, explain the concurrent history before proceeding; use the recorded baseline hash, not an assumed count.
+If the count is not 39, stop and explain the history before proceeding; use the recorded baseline hash, not an assumed count. Continue directly to Task 8 so `dev` is recreated and protected before development resumes.
 
 ---
 

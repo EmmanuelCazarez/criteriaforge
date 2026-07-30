@@ -6,14 +6,18 @@ head_ref="${2:-}"
 head_repository="${3:-}"
 base_repository="${4:-}"
 base_ref="${5:-}"
+base_sha="${6:-}"
 
 title_pattern='^(feat|fix|docs|refactor|test|build|ci|chore|perf|revert)(\([a-z0-9][a-z0-9._/-]*\))?!?: .+'
 branch_pattern='^(feature|fix|docs|refactor|test|build|ci|chore|release|dependabot)/[A-Za-z0-9._/-]+$'
 semver_core='(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'
 release_title_pattern="^chore\\(release\\): release ${semver_core}$"
+bootstrap_title='ci: adopt release-only main governance'
+bootstrap_base_sha='cab27f008b664df78ac83247f3ad27cf160fa72e'
 
-if [[ -z "${head_ref}" || -z "${head_repository}" || -z "${base_repository}" || -z "${base_ref}" ]]; then
-  echo "Pull request branch, repository, and destination metadata are required."
+if [[ -z "${head_ref}" || -z "${head_repository}" || -z "${base_repository}" ||
+  -z "${base_ref}" || -z "${base_sha}" ]]; then
+  echo "Pull request branch, repository, destination, and base SHA metadata are required."
   exit 1
 fi
 
@@ -48,6 +52,17 @@ case "${base_ref}" in
       echo "Release pull requests must originate from the exact dev branch."
       echo "Current source branch: ${head_ref}"
       exit 1
+    fi
+
+    if [[ "${title}" == "${bootstrap_title}" ]]; then
+      if [[ "${base_sha}" != "${bootstrap_base_sha}" ]]; then
+        echo "The one-time governance bootstrap requires the approved main base SHA."
+        echo "Current base SHA: ${base_sha}"
+        exit 1
+      fi
+
+      echo "Accepted one-time governance bootstrap pull request."
+      exit 0
     fi
 
     if [[ ! "${title}" =~ ${release_title_pattern} ]]; then

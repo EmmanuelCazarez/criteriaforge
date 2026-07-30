@@ -3,6 +3,7 @@ name: CI
 on:
   pull_request:
     branches: [dev, main]
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [dev, main]
   workflow_dispatch:
@@ -27,6 +28,7 @@ jobs:
           HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
           BASE_REPOSITORY: ${{ github.repository }}
           BASE_REF: ${{ github.base_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: >-
           .github/scripts/validate-pr-policy.sh
           "${PR_TITLE}"
@@ -34,15 +36,20 @@ jobs:
           "${HEAD_REPOSITORY}"
           "${BASE_REPOSITORY}"
           "${BASE_REF}"
+          "${BASE_SHA}"
       - name: Set up Java 17 for release metadata validation
-        if: github.base_ref == 'main'
+        if: >-
+          github.base_ref == 'main' &&
+          github.event.pull_request.title != 'ci: adopt release-only main governance'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
           cache: maven
       - name: Validate release pull request metadata
-        if: github.base_ref == 'main'
+        if: >-
+          github.base_ref == 'main' &&
+          github.event.pull_request.title != 'ci: adopt release-only main governance'
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
