@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [dev, main]
   push:
-    branches: [main]
+    branches: [dev, main]
   workflow_dispatch:
 
 permissions:
@@ -26,12 +26,28 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
           HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
           BASE_REPOSITORY: ${{ github.repository }}
+          BASE_REF: ${{ github.base_ref }}
         run: >-
           .github/scripts/validate-pr-policy.sh
           "${PR_TITLE}"
           "${HEAD_REF}"
           "${HEAD_REPOSITORY}"
           "${BASE_REPOSITORY}"
+          "${BASE_REF}"
+      - name: Set up Java 17 for release metadata validation
+        if: github.base_ref == 'main'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Validate release pull request metadata
+        if: github.base_ref == 'main'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          project_version="$(./mvnw -q help:evaluate -Dexpression=project.version -DforceStdout)"
+          .github/scripts/validate-release-pr.sh "${PR_TITLE}" "${project_version}" CHANGELOG.md
 
   build-java17-boot3:
     runs-on: ubuntu-latest
