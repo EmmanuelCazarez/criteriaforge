@@ -55,6 +55,8 @@ deletion, requires pull requests to be current with `main`, and requires all
 review conversations to be resolved. The repository requires an approving
 review when another maintainer is available.
 
+These repository protections were activated and live-verified on 2026-07-30.
+
 ## Release boundary
 
 A merge to `main` runs CI but does not publish. Release preparation is a
