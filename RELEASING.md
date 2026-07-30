@@ -1,8 +1,13 @@
 # Releasing CriteriaForge
 
-This guide prepares the first `0.1.0` publication through the Maven Central Publisher Portal. Complete account and credential steps once; repeat the candidate and publication steps for every version.
+This guide prepares every CriteriaForge release through the Maven Central
+Publisher Portal. Complete account and credential steps once; repeat the
+release preparation and publication steps for every version.
 
-Publishing is intentionally two-stage: GitHub Actions uploads and waits for Central validation, then a maintainer reviews and manually publishes. Once Maven Central publishes a coordinate, it cannot be replaced, edited, or deleted. Fixes require a new version.
+Publishing is intentionally two-stage: the Release workflow uploads and waits
+for Central validation, then a maintainer reviews and manually publishes.
+Once Maven Central publishes a coordinate, it cannot be replaced, edited, or
+deleted. Fixes require a new version.
 
 ## 1. Create the Central account and namespace
 
@@ -53,46 +58,43 @@ required reviewers so the deployment job cannot start without manual approval.
 Do not put secret values in repository-level secrets, environment variables
 committed to the repository, workflow defaults, Maven POMs, issues, or logs.
 
-## 5. Verify a candidate locally
+## 5. Prepare, verify, and publish a release
 
-The development version remains `0.1.0-SNAPSHOT`. Before the release pull request, run:
+1. Choose `0.1.1` for fixes, `0.2.0` for backward-compatible features, `0.MINOR.0` plus migration notes for breaking `0.x` changes, and `1.0.0` when the public API becomes stable.
+2. Create `release/X.Y.Z` from current `main`.
+3. Change every reactor version from the current snapshot to `X.Y.Z`, set SCM tag to `vX.Y.Z`, and update `CHANGELOG.md`.
+4. Run Boot 3, Boot 4, PostgreSQL, quality/documentation, and release-profile verification:
 
-```text
-./mvnw -B -ntp clean verify -Dspring-boot.version=3.5.16
-./mvnw -B -ntp clean verify -Dspring-boot.version=4.1.0
-./mvnw -B -ntp -Pquality,documentation verify
-./mvnw -B -ntp -Prelease -Dgpg.skip=true -Dcentral.skipPublishing=true clean verify
-```
+   ```text
+   ./mvnw -B -ntp clean verify -Dspring-boot.version=3.5.16
+   ./mvnw -B -ntp clean verify -Dspring-boot.version=4.1.0
+   ./mvnw -B -ntp -Ppostgresql-tests verify
+   ./mvnw -B -ntp -Pquality,documentation verify
+   ./mvnw -B -ntp -Prelease -Dgpg.skip=true -Dcentral.skipPublishing=true clean verify
+   ```
 
-The last command creates the main, source, and Javadoc artifacts without signing or contacting Central. Inspect the published module targets. The release profile explicitly excludes `criteriaforge-example` from the Central bundle.
+   The release profile creates the main, source, and Javadoc artifacts without
+   signing or contacting Central. Inspect the published module targets; it
+   explicitly excludes `criteriaforge-example` from the Central bundle.
+5. Open `chore(release): prepare X.Y.Z` targeting `main`.
+6. Squash-merge after all checks pass and wait for the post-merge `main` CI run.
+7. Create annotated signed tag `vX.Y.Z` on the exact successful `main` commit and verify it locally:
 
-## 6. Prepare version 0.1.0
+   ```text
+   git tag -s -a vX.Y.Z -m "Release vX.Y.Z" MAIN_COMMIT
+   git tag --verify vX.Y.Z
+   git rev-parse vX.Y.Z^{commit}
+   ```
 
-1. Ensure [Changelog](CHANGELOG.md) describes the candidate and replaces `Unreleased` for `0.1.0` with the real date.
-2. Change all reactor versions from `0.1.0-SNAPSHOT` to `0.1.0` using Maven's versions tooling or one reviewed mechanical change.
-3. Run the complete verification matrix again.
-4. Commit the version change on `dev` and open the release pull request from `dev` to `main`.
-5. Wait for all required checks and review conversations, then merge.
-6. Create signed tag `v0.1.0` from that exact `main` commit and push only after checking the commit and version.
-7. Publish a GitHub Release for `v0.1.0`, or manually dispatch the Release workflow with version `0.1.0` from that tag.
-
-The workflow rejects snapshot versions, mismatched tags, and commits that are not contained in `main`.
-
-## 7. Approve upload, inspect, then publish
-
-1. Review the pending `maven-central` environment deployment in GitHub and approve it.
-2. The workflow tests, signs, uploads, and waits until Central reports `VALIDATED`. It uses `autoPublish=false`.
-3. Open Central Portal deployments. Inspect every module, coordinate, POM, source JAR, Javadoc JAR, signature, license, SCM URL, and validation message.
-4. If everything is exact, choose **Publish** in Central Portal.
-5. If anything is wrong, choose **Drop**. Correct the source and use a new candidate. Never publish a questionable bundle to “fix later.”
-6. After publication, wait for synchronization and verify a clean sample project can resolve `io.github.emmanuelcazarez:criteriaforge-spring-boot-starter:0.1.0` from Maven Central.
-
-Published coordinates are immutable. If `0.1.0` contains a defect, publish `0.1.1`; do not attempt to overwrite `0.1.0`.
+8. Push only that tag; the Release workflow verifies the signature and full matrix before requesting `maven-central` approval. It validates the immutable tagged candidate with trusted release tooling from protected `main`, so a manual recovery run may only name the same existing signed tag.
+9. Approve the environment, inspect the Central deployment at `VALIDATED`, and publish it manually. Confirm every module, coordinate, POM, source JAR, Javadoc JAR, signature, license, SCM URL, and validation message before selecting **Publish**.
+10. Verify the public coordinates, then publish the GitHub Release from the unchanged signed tag.
+11. Open and squash a temporary `chore/next-snapshot` pull request that advances to the next planned snapshot.
 
 ## Recovery
 
 - **Validation failed:** read Central's per-file messages, drop the deployment, add a regression check, and upload a corrected candidate.
-- **Workflow failed before upload:** fix the workflow/build on `dev`, repeat the release pull request, and create a new approved tag only if the release commit changes.
+- **Workflow failed before upload:** do not move or replace the signed tag. A manual recovery run may repeat verification only for that existing tag. If source or release metadata must change, prepare and merge a new release candidate and use a new version and signed tag.
 - **Signing key exposed:** revoke it, remove GitHub secrets, publish the revocation, create a new key, and rotate the workflow secrets before another release.
 - **Central token exposed:** revoke it in Central immediately and replace both token secrets.
 - **Wrong artifact already published:** publication cannot be reversed. Publish a corrected patch version and document the affected version.

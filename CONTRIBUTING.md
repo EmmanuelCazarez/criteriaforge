@@ -12,11 +12,13 @@ Docker is optional locally and required to execute the PostgreSQL integration te
 
 ## Development workflow
 
-1. Branch from `dev` using `feature/<short-name>`.
-2. Add a failing focused test for behavior changes or bug fixes.
+1. Branch from current `main` using an approved same-repository prefix, or use any branch name in a fork.
+2. Add a failing focused test for behavior changes or fixes.
 3. Implement the smallest coherent change.
-4. Run the focused module, then the complete compatibility checks.
-5. Open a pull request into `dev` and describe public API, security, and compatibility effects.
+4. Run focused tests and the complete compatibility checks.
+5. Open a pull request targeting `main` with a Conventional Commit title and complete compatibility/security notes.
+6. Resolve conversations and update the branch with current `main`.
+7. Squash-merge after every required check passes; allow automatic deletion of same-repository source branches.
 
 Do not put business rules, transport response formats, generic writes, or organization-specific abstractions into the query engine. Preserve the dependency direction described in [Architecture](docs/architecture.md).
 
@@ -29,7 +31,7 @@ Do not put business rules, transport response formats, generic writes, or organi
 ./mvnw -B -ntp -Pquality,documentation verify
 ```
 
-The PostgreSQL command executes against PostgreSQL 17 when Docker is available. CI always has the required container runtime.
+The PostgreSQL command executes against PostgreSQL 17 when Docker is available. CI always has the required container runtime. Pull requests also require the remote `pr-policy`, `dependency-review`, and `codeql-java` checks, in addition to the Boot 3, Boot 4, PostgreSQL, and quality checks. `pr-policy` verifies the Conventional Commit title and the approved prefix for a same-repository branch.
 
 ## Compatibility and public API
 
