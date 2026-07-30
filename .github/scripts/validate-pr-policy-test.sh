@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-validator="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/validate-pr-policy.sh"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+validator="${VALIDATOR_UNDER_TEST:-${script_dir}/validate-pr-policy.sh}"
+workflow="${WORKFLOW_UNDER_TEST:-${script_dir}/../workflows/ci.yml}"
 repository="EmmanuelCazarez/criteriaforge"
 bootstrap_base_sha="cab27f008b664df78ac83247f3ad27cf160fa72e"
 wrong_base_sha="0000000000000000000000000000000000000000"
+normal_release_base_sha="1111111111111111111111111111111111111111"
 
 expect_pass() {
   local label="$1"
@@ -22,6 +25,38 @@ expect_fail() {
     echo "FAIL: ${label} should fail."
     exit 1
   fi
+}
+
+assert_workflow_conditions() {
+  ruby -ryaml - "${workflow}" <<'RUBY'
+workflow = YAML.load_file(ARGV.fetch(0))
+steps = workflow.fetch("jobs").fetch("pr-policy").fetch("steps")
+setup = steps.find { |step| step["name"] == "Set up Java 17 for release metadata validation" }
+metadata = steps.find { |step| step["name"] == "Validate release pull request metadata" }
+expected = "github.base_ref == 'main' && github.event.pull_request.title != 'ci: adopt release-only main governance'"
+
+unless setup&.fetch("if", nil) == expected && metadata&.fetch("if", nil) == expected
+  warn "FAIL: release metadata steps must skip only the exact governance title."
+  exit 1
+end
+
+metadata_runs = lambda do |base_ref, title|
+  base_ref == "main" && title != "ci: adopt release-only main governance"
+end
+
+if metadata_runs.call("main", "ci: adopt release-only main governance")
+  warn "FAIL: exact governance title should skip release metadata."
+  exit 1
+end
+unless metadata_runs.call("main", "chore(release): release 0.2.0")
+  warn "FAIL: normal main release title should run release metadata."
+  exit 1
+end
+if metadata_runs.call("dev", "chore(release): release 0.2.0")
+  warn "FAIL: dev-targeting pull requests should not run release metadata."
+  exit 1
+end
+RUBY
 }
 
 expect_pass "feature branch and feat title" \
@@ -61,15 +96,33 @@ expect_pass "fork branch is allowed for dev" \
   "${validator}" "fix(web): preserve repeated parameters" \
   "my-personal-branch" "contributor/criteriaforge" "${repository}" "dev" "${bootstrap_base_sha}"
 
-expect_pass "dev promotes an exact release to main" \
+expect_pass "normal release remains valid after bootstrap base expires" \
   "${validator}" "chore(release): release 0.2.0" \
-  "dev" "${repository}" "${repository}" "main" "${bootstrap_base_sha}"
+  "dev" "${repository}" "${repository}" "main" "${normal_release_base_sha}"
 expect_pass "exact one-time governance bootstrap to main" \
   "${validator}" "ci: adopt release-only main governance" \
   "dev" "${repository}" "${repository}" "main" "${bootstrap_base_sha}"
 expect_fail "governance bootstrap rejects a different base SHA" \
   "${validator}" "ci: adopt release-only main governance" \
   "dev" "${repository}" "${repository}" "main" "${wrong_base_sha}"
+expect_fail "governance bootstrap rejects a wrong head ref" \
+  "${validator}" "ci: adopt release-only main governance" \
+  "ci/governance" "${repository}" "${repository}" "main" "${bootstrap_base_sha}"
+expect_fail "governance bootstrap rejects a wrong head repository" \
+  "${validator}" "ci: adopt release-only main governance" \
+  "dev" "contributor/criteriaforge" "${repository}" "main" "${bootstrap_base_sha}"
+expect_fail "governance bootstrap rejects a wrong base repository" \
+  "${validator}" "ci: adopt release-only main governance" \
+  "dev" "${repository}" "OtherOwner/criteriaforge" "main" "${bootstrap_base_sha}"
+expect_fail "governance bootstrap rejects a wrong base ref" \
+  "${validator}" "ci: adopt release-only main governance" \
+  "dev" "${repository}" "${repository}" "staging" "${bootstrap_base_sha}"
+expect_fail "governance bootstrap rejects a near-match title" \
+  "${validator}" "ci: adopt release only main governance" \
+  "dev" "${repository}" "${repository}" "main" "${bootstrap_base_sha}"
+expect_fail "governance bootstrap rejects a missing base SHA" \
+  "${validator}" "ci: adopt release-only main governance" \
+  "dev" "${repository}" "${repository}" "main"
 expect_fail "invalid pull request title" \
   "${validator}" "Add grouped projections" \
   "feature/grouped-projections" "${repository}" "${repository}" "dev" "${bootstrap_base_sha}"
@@ -113,5 +166,7 @@ expect_fail "unsupported source prefix targeting dev" \
 expect_fail "unsupported base branch" \
   "${validator}" "feat: add feature" \
   "feature/add-feature" "${repository}" "${repository}" "staging" "${bootstrap_base_sha}"
+
+assert_workflow_conditions
 
 echo "All pull request policy tests passed."

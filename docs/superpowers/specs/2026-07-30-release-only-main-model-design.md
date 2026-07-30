@@ -23,6 +23,10 @@ That correction uses a one-time bootstrap exception: a same-repository
 `ci: adopt release-only main governance` is accepted only while the pull
 request base SHA is `cab27f008b664df78ac83247f3ad27cf160fa72e`. Once `main`
 moves, the exception becomes unusable without any follow-up configuration.
+Task 7 verifies that the exact live `protect-main` ruleset is active,
+main-only, and requires strict current status checks including `pr-policy`.
+Immediately before merge it also requires both fetched `main` and the PR base
+OID to remain at the pinned SHA.
 
 ## Invariants
 
@@ -163,6 +167,10 @@ release-version workflow check. The policy receives the pull request base SHA
 from GitHub and pins the one-time governance bootstrap to the pre-migration
 `main` commit, so the exception expires automatically when that branch
 advances.
+The migration does not assume that checked-in protection is live: before
+opening the bootstrap PR it queries the exact live ruleset and proves active
+enforcement, a main-only target, strict required-status-check mode, the
+`pr-policy` context, and parity with all checked-in required contexts.
 
 A new `protect-dev` ruleset requires current pull requests, linear history,
 resolved review conversations, and the required checks. It blocks direct and
@@ -190,17 +198,24 @@ signed `vX.Y.Z` tag on that exact `main` commit.
 2. Prepare one final governance correction PR containing branch policies,
    CI triggers, Dependabot target, ruleset source of truth, and documentation.
 3. After freshly proving that remote `dev` has no unique intended work or
-   dependent pull request, reset it with an exact force-with-lease to the
-   verified governance tip; never publish a remote migration/docs branch.
-4. Open the pinned one-time `dev`-to-`main` governance PR and squash-merge it as
-   the final legacy administrative commit.
-5. Recreate `dev` from the corrected `main` tip.
-6. Apply and verify live `protect-main` and `protect-dev` rulesets.
-7. Retarget or recreate Dependabot PRs against `dev`.
-8. Recreate the five-file record cleanup on a `refactor/` branch from `dev`,
+   dependent pull request, record that reviewed SHA. Re-fetch, require remote
+   `dev` still equals the recorded SHA, repeat PR-dependency checks, and reset
+   it with an exact force-with-lease to the verified governance tip; never
+   publish a remote migration/docs branch.
+4. Retain both old and governance SHAs until merge. Any failure before merge
+   closes the bootstrap PR and restores the reviewed old `dev` with a lease
+   requiring remote `dev` still equal the governance SHA.
+5. Verify live strict `protect-main`, open the pinned one-time `dev`-to-`main`
+   governance PR, and immediately before squash merge reassert both current
+   `main` and the PR base OID equal the pinned SHA.
+6. Squash-merge the PR as the final legacy administrative commit.
+7. Recreate `dev` from the corrected `main` tip.
+8. Apply and verify live `protect-main` and `protect-dev` rulesets.
+9. Retarget or recreate Dependabot PRs against `dev`.
+10. Recreate the five-file record cleanup on a `refactor/` branch from `dev`,
    verify it, squash-merge it to `dev`, and delete both temporary source
    branches when safe.
-9. Verify the final remote inventory: `main`, `dev`, and branches belonging
+11. Verify the final remote inventory: `main`, `dev`, and branches belonging
    only to active pull requests.
 
 ## Retention audit of the prior migration

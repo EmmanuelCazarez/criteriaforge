@@ -146,6 +146,7 @@ Add passing cases:
 - `feature/*`, `fix/*`, `docs/*`, `refactor/*`, `test/*`, `build/*`, `ci/*`, `chore/*`, `release/*`, and `dependabot/*` from the same repository to `dev`, with Conventional Commit PR titles.
 - A fork branch to `dev`, with a Conventional Commit PR title.
 - Exact same-repository `dev` to `main` with `chore(release): release 0.2.0`.
+- A normal release title against a different nonempty base SHA, proving releases remain valid after bootstrap expiry.
 - The exact one-time same-repository `dev`-to-`main` governance title against base SHA `cab27f008b664df78ac83247f3ad27cf160fa72e`.
 
 Add failing cases:
@@ -154,6 +155,12 @@ Add failing cases:
 - `dev` from a fork targeting `main`.
 - `dev` to `main` with a non-release title.
 - The governance title with any different base SHA.
+- The governance title with a wrong head ref.
+- The governance title with a wrong head repository.
+- The governance title with a wrong base repository.
+- The governance title with a wrong base ref.
+- A near-match governance title.
+- The governance tuple with a missing base SHA.
 - A release title with `-SNAPSHOT`, missing patch number, leading-zero numeric parts, or extra text.
 - A same-repository branch with an unapproved prefix targeting `dev`.
 - An unsupported base branch.
@@ -296,6 +303,7 @@ Update `.github/workflows/ci.yml` so:
 
 - The main-targeting PR then invokes `validate-release-pr.sh` with the PR title, resolved project version, and `CHANGELOG.md`. Only the exact governance title skips these release-metadata steps; `pr-policy` still rejects that title unless the complete bootstrap tuple matches.
 - The job context remains exactly `pr-policy`.
+- `validate-pr-policy-test.sh` persistently parses both metadata-step conditions, proves the exact governance title skips them, and proves a normal `main` release title runs them.
 
 - [ ] **Step 5: Lint and inspect the workflow**
 
@@ -598,11 +606,13 @@ Resolve every high-confidence issue and rerun affected checks.
 
 ```bash
 bootstrap_base_sha=cab27f008b664df78ac83247f3ad27cf160fa72e
+bootstrap_state_file=/private/tmp/criteriaforge-task7-bootstrap-state
 git fetch --prune origin
 git status --short --branch
 test "$(git rev-parse origin/main)" = "${bootstrap_base_sha}"
 git rev-list --left-right --count origin/main...HEAD
 git merge-base --is-ancestor origin/main HEAD
+test ! -e "${bootstrap_state_file}"
 ```
 
 Expected:
@@ -610,45 +620,117 @@ Expected:
 - Worktree is clean.
 - The reviewed governance implementation contains the pinned `origin/main`.
 - `origin/main` still identifies exactly `cab27f008b664df78ac83247f3ad27cf160fa72e`.
+- No stale bootstrap state file exists. If one exists, inspect and resolve the prior attempt instead of overwriting it.
 - If `main` moved, stop. The bootstrap exception is intentionally unusable; do not rebase, refresh, or broaden the pinned exception without a new human ruling.
 
-- [ ] **Step 2: Prove that resetting remote `dev` is still safe**
+- [ ] **Step 2: Prove that resetting remote `dev` is safe and record the reviewed SHA**
+
+Capture the old remote SHA before reviewing its history. The state file contains only public commit identifiers and is retained until governance merge or rollback completes.
 
 ```bash
-gh pr list --state open --base dev --json number,title,headRefName,url
-gh pr list --state open --head dev --json number,title,baseRefName,url
+bootstrap_state_file=/private/tmp/criteriaforge-task7-bootstrap-state
+test "$(gh pr list --state open --base dev --json number --jq 'length')" -eq 0
+test "$(gh pr list --state open --head dev --json number --jq 'length')" -eq 0
+verified_old_dev_sha="$(git rev-parse refs/remotes/origin/dev)"
+governance_sha="$(git rev-parse HEAD)"
+[[ "${verified_old_dev_sha}" =~ ^[0-9a-f]{40}$ ]]
+[[ "${governance_sha}" =~ ^[0-9a-f]{40}$ ]]
 git log --left-right --cherry-pick --oneline origin/main...origin/dev
 git diff --stat origin/main..origin/dev
 git diff --stat origin/dev..origin/main
-git rev-parse origin/dev
-git rev-parse HEAD
+printf 'verified_old_dev_sha=%s\ngovernance_sha=%s\n' \
+  "${verified_old_dev_sha}" "${governance_sha}" > "${bootstrap_state_file}"
+chmod 600 "${bootstrap_state_file}"
 ```
 
 Expected:
 
 - No pull request depends on the old remote `dev`.
 - No unique intended change remains only on old remote `dev`.
-- The exact old remote `dev` SHA and reviewed governance HEAD are recorded.
+- `verified_old_dev_sha` is the exact SHA whose history and tree differences were reviewed, and both that SHA and the governance SHA are persisted for lease and rollback use.
 - If any condition is unclear, stop without changing remote state.
 
 - [ ] **Step 3: Reset only remote `dev` to the verified governance tip**
 
-Re-fetch, recapture the expected old remote SHA, and use an exact force-with-lease. Never push `docs/release-only-main-model` or any other migration/docs branch remotely.
+Do not recapture or replace `verified_old_dev_sha`. After the fresh fetch, require remote `dev` to equal the SHA reviewed in Step 2 and repeat both PR-dependency checks before the lease-protected reset. Never push `docs/release-only-main-model` or any other migration/docs branch remotely.
 
 ```bash
+bootstrap_base_sha=cab27f008b664df78ac83247f3ad27cf160fa72e
+bootstrap_state_file=/private/tmp/criteriaforge-task7-bootstrap-state
+source "${bootstrap_state_file}"
+[[ "${verified_old_dev_sha}" =~ ^[0-9a-f]{40}$ ]]
+[[ "${governance_sha}" =~ ^[0-9a-f]{40}$ ]]
 git fetch --prune origin
-old_dev_sha="$(git rev-parse refs/remotes/origin/dev)"
-governance_sha="$(git rev-parse HEAD)"
-test "$(git rev-parse origin/main)" = cab27f008b664df78ac83247f3ad27cf160fa72e
-git push --force-with-lease="refs/heads/dev:${old_dev_sha}" origin HEAD:refs/heads/dev
+test "$(git rev-parse origin/main)" = "${bootstrap_base_sha}"
+test "$(git rev-parse refs/remotes/origin/dev)" = "${verified_old_dev_sha}"
+test "$(git rev-parse HEAD)" = "${governance_sha}"
+test "$(gh pr list --state open --base dev --json number --jq 'length')" -eq 0
+test "$(gh pr list --state open --head dev --json number --jq 'length')" -eq 0
+git push --force-with-lease="refs/heads/dev:${verified_old_dev_sha}" origin "${governance_sha}:refs/heads/dev"
 git fetch --prune origin
 test "$(git rev-parse origin/dev)" = "${governance_sha}"
-test "$(git rev-parse origin/main)" = cab27f008b664df78ac83247f3ad27cf160fa72e
+test "$(git rev-parse origin/main)" = "${bootstrap_base_sha}"
 ```
 
-Expected: only remote `dev` changes, and it identifies the exact reviewed governance commit. A lease failure is a stop condition; do not retry with an unqualified force push.
+Expected: only remote `dev` changes, and it identifies the exact reviewed governance commit. Any SHA mismatch, new dependent PR, or lease failure is a stop condition; do not recapture the lease SHA or retry with an unqualified force push.
 
-- [ ] **Step 4: Open the final legacy governance PR**
+**Mandatory rollback for any failure or abort after Step 3 and before governance merge:** close the governance PR if it was opened, then restore only the reviewed old `dev` SHA with a lease requiring remote `dev` to remain at the governance SHA. Do not require `main` to remain pinned in order to perform this rollback; `main` movement makes rollback more urgent because the bootstrap is no longer usable.
+
+```bash
+bootstrap_state_file=/private/tmp/criteriaforge-task7-bootstrap-state
+source "${bootstrap_state_file}"
+if [[ -z "${PR_NUMBER:-}" ]]; then
+  rollback_pr_numbers="$(gh pr list --state open --base main --head dev \
+    --json number,title \
+    --jq '.[] | select(.title == "ci: adopt release-only main governance") | .number')"
+  test "$(printf '%s\n' "${rollback_pr_numbers}" | sed '/^$/d' | wc -l | tr -d ' ')" -le 1
+  PR_NUMBER="$(printf '%s\n' "${rollback_pr_numbers}" | sed '/^$/d')"
+fi
+if [[ -n "${PR_NUMBER:-}" ]]; then
+  gh pr close "${PR_NUMBER}" --comment "Closing the aborted governance bootstrap before restoring dev."
+fi
+git fetch --prune origin
+test "$(git rev-parse refs/remotes/origin/dev)" = "${governance_sha}"
+test "$(gh pr list --state open --base dev --json number --jq 'length')" -eq 0
+test "$(gh pr list --state open --head dev --json number --jq 'length')" -eq 0
+git push --force-with-lease="refs/heads/dev:${governance_sha}" origin "${verified_old_dev_sha}:refs/heads/dev"
+git fetch --prune origin
+test "$(git rev-parse refs/remotes/origin/dev)" = "${verified_old_dev_sha}"
+rm -f "${bootstrap_state_file}"
+```
+
+If rollback encounters a changed remote `dev`, dependent PR, or lease failure, stop and report the exact state. Never use an unqualified force push.
+
+- [ ] **Step 4: Verify the exact live strict `protect-main` ruleset**
+
+Automatic bootstrap expiry is trusted only when the live ruleset requires current checks against the latest `main`. Before opening the PR, require exactly one active `protect-main`, a branch target limited to `refs/heads/main`, strict required-status-check mode, and the required `pr-policy` context. Also compare all live required contexts with the checked-in source of truth.
+
+```bash
+repository=EmmanuelCazarez/criteriaforge
+protect_main_ids="$(gh api --paginate "repos/${repository}/rulesets" \
+  --jq '.[] | select(.name == "protect-main") | .id')"
+test "$(printf '%s\n' "${protect_main_ids}" | sed '/^$/d' | wc -l | tr -d ' ')" -eq 1
+protect_main_id="$(printf '%s\n' "${protect_main_ids}" | sed '/^$/d')"
+protect_main_json="$(gh api "repos/${repository}/rulesets/${protect_main_id}")"
+printf '%s\n' "${protect_main_json}" | jq -e '
+  .name == "protect-main" and
+  .target == "branch" and
+  .enforcement == "active" and
+  .conditions.ref_name.include == ["refs/heads/main"] and
+  .conditions.ref_name.exclude == [] and
+  any(.rules[];
+    .type == "required_status_checks" and
+    .parameters.strict_required_status_checks_policy == true and
+    any(.parameters.required_status_checks[]; .context == "pr-policy"))
+'
+diff -u \
+  <(jq -r '.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context' .github/rulesets/protect-main.json | sort) \
+  <(printf '%s\n' "${protect_main_json}" | jq -r '.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context' | sort)
+```
+
+Expected: the exact live ruleset is active, targets only `main`, requires strict up-to-date status checks, includes `pr-policy`, and has all seven checked-in contexts. If any assertion fails, run the mandatory rollback and stop; do not open the PR.
+
+- [ ] **Step 5: Open the final legacy governance PR**
 
 Create a PR:
 
@@ -669,10 +751,20 @@ The body must clearly state:
 
 The `pr-policy` job must receive the base SHA from the pull request event. Java setup and release-metadata validation skip only this exact governance title; any wrong repository, branch, title, base, or base SHA still fails policy.
 
-- [ ] **Step 5: Wait for exact required checks**
+After creation, record the PR number for checks and rollback:
 
 ```bash
-gh pr checks <PR_NUMBER> --watch
+bootstrap_state_file=/private/tmp/criteriaforge-task7-bootstrap-state
+PR_NUMBER="$(gh pr view dev --json number --jq '.number')"
+[[ "${PR_NUMBER}" =~ ^[0-9]+$ ]]
+printf 'PR_NUMBER=%s\n' "${PR_NUMBER}" >> "${bootstrap_state_file}"
+```
+
+- [ ] **Step 6: Wait for exact required checks**
+
+```bash
+source /private/tmp/criteriaforge-task7-bootstrap-state
+gh pr checks "${PR_NUMBER}" --watch
 ```
 
 Expected all pass:
@@ -685,7 +777,39 @@ Expected all pass:
 - `dependency-review`
 - `codeql-java`
 
-- [ ] **Step 6: Squash merge and verify auto-deletion**
+- [ ] **Step 7: Reassert the pinned base immediately before merge**
+
+After all checks pass, re-fetch and require both current `main` and the pull request's immutable base OID to equal the pinned bootstrap SHA. Also require the PR to remain open with the exact base, head, and title. Perform the squash merge immediately after these assertions; if there is any delay or intervening action, rerun this step.
+
+```bash
+bootstrap_base_sha=cab27f008b664df78ac83247f3ad27cf160fa72e
+source /private/tmp/criteriaforge-task7-bootstrap-state
+git fetch --prune origin
+test "$(git rev-parse refs/remotes/origin/main)" = "${bootstrap_base_sha}"
+pr_json="$(gh api graphql \
+  -F owner=EmmanuelCazarez \
+  -F name=criteriaforge \
+  -F number="${PR_NUMBER}" \
+  -f query='query($owner: String!, $name: String!, $number: Int!) {
+    repository(owner: $owner, name: $name) {
+      pullRequest(number: $number) {
+        state baseRefName baseRefOid headRefName title
+        headRepository { nameWithOwner }
+      }
+    }
+  }' \
+  --jq '.data.repository.pullRequest')"
+test "$(printf '%s\n' "${pr_json}" | jq -r '.state')" = OPEN
+test "$(printf '%s\n' "${pr_json}" | jq -r '.baseRefName')" = main
+test "$(printf '%s\n' "${pr_json}" | jq -r '.baseRefOid')" = "${bootstrap_base_sha}"
+test "$(printf '%s\n' "${pr_json}" | jq -r '.headRefName')" = dev
+test "$(printf '%s\n' "${pr_json}" | jq -r '.headRepository.nameWithOwner')" = EmmanuelCazarez/criteriaforge
+test "$(printf '%s\n' "${pr_json}" | jq -r '.title')" = "ci: adopt release-only main governance"
+```
+
+Expected: both the fetched `main` tip and PR base OID remain exactly pinned. Any mismatch triggers the mandatory rollback; never merge a refreshed or retargeted bootstrap PR.
+
+- [ ] **Step 8: Squash merge and verify auto-deletion**
 
 Use the GitHub squash merge operation. Do not merge locally and do not use rebase merge.
 
@@ -696,7 +820,7 @@ Expected:
 - The resulting commit message is the governance PR title.
 - The bootstrap exception is now unusable because `main` no longer has the pinned base SHA.
 
-- [ ] **Step 7: Record the freeze baseline**
+- [ ] **Step 9: Record the freeze baseline**
 
 ```bash
 git fetch --prune origin
@@ -706,6 +830,7 @@ test "$(git rev-parse origin/main)" != cab27f008b664df78ac83247f3ad27cf160fa72e
 git ls-remote --heads origin dev
 git ls-remote --heads origin docs/release-only-main-model
 git tag -v v0.1.0
+rm -f /private/tmp/criteriaforge-task7-bootstrap-state
 ```
 
 Expected:
