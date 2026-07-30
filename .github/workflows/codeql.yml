@@ -1,0 +1,36 @@
+name: CodeQL
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql-java:
+    name: codeql-java
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: java-kotlin
+      - name: Build Java 17 and Spring Boot 3 baseline
+        run: ./mvnw -B -ntp -DskipTests package -Dspring-boot.version=3.5.16
+      - uses: github/codeql-action/analyze@v4

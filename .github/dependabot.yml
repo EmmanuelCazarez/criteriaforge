@@ -4,7 +4,7 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    target-branch: dev
+    target-branch: main
     open-pull-requests-limit: 5
     ignore:
       # Spring Boot 3 remains the library baseline. Boot 4 compatibility is
@@ -16,5 +16,5 @@ updates:
     directory: /
     schedule:
       interval: weekly
-    target-branch: dev
+    target-branch: main
     open-pull-requests-limit: 5

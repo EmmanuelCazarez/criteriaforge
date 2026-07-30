@@ -3,35 +3,75 @@
 The permanent flow is:
 
 ```text
-feature/* -> pull request -> dev -> release pull request -> main -> approved tag -> Maven Central
+temporary branch or fork -> pull request -> required checks -> squash merge -> main
 ```
 
-## Branch roles
+`main` is the only permanent and default branch. There is no `dev` or `qa`
+branch in the final model.
 
-- `feature/*` contains isolated changes and targets `dev` through a pull request.
-- `dev` integrates the next snapshot and is the default target for dependency updates.
-- `main` is always releasable and receives only reviewed release pull requests from `dev` plus narrowly scoped emergency fixes.
-- `vX.Y.Z` tags are immutable and are created only from `main` after release approval.
+## Temporary branches and pull requests
 
-There is intentionally no `qa` branch. A library has no separately deployed QA runtime; the candidate is the immutable source commit and its artifacts. Automated tests run before merge on `dev`, then again for the exact release candidate on `main`.
+Same-repository temporary branches must use one of these prefixes:
 
-## Protection rules
+- `feature/`
+- `fix/`
+- `docs/`
+- `refactor/`
+- `test/`
+- `build/`
+- `ci/`
+- `chore/`
+- `release/`
+- `dependabot/`
 
-Protect both `dev` and `main` with:
+External fork branch names are accepted. The prefix policy applies only to
+branches owned by the CriteriaForge repository.
 
-- no direct pushes or force pushes;
-- pull requests required;
-- all review conversations resolved;
-- branches required to be up to date before merging;
-- required checks `build-java17-boot3`, `build-java17-boot4`, `postgresql`, and `quality`;
-- deletion disabled for permanent branches.
+Temporary branches may contain multiple development or fixup commits. GitHub
+writes one squash commit to `main` for each merged pull request. Pull request
+titles become that commit title and must use an approved Conventional Commit
+type: `feat`, `fix`, `docs`, `refactor`, `test`, `build`, `ci`, `chore`,
+`perf`, or `revert`. Scopes are optional.
 
-Require at least one approving review when another maintainer is available. Use the normal repository merge strategy consistently and delete merged feature branches.
+Only squash merging is enabled. Resolve review conversations and update the
+pull request with current `main` before merging. Same-repository source
+branches are automatically deleted after merge; GitHub cannot delete a branch
+in a contributor's fork.
+
+## Required checks and protection
+
+Pull requests to `main` require these exact checks:
+
+- `pr-policy`
+- `build-java17-boot3`
+- `build-java17-boot4`
+- `postgresql`
+- `quality`
+- `dependency-review`
+- `codeql-java`
+
+The `main` ruleset also blocks direct pushes, force pushes, and branch
+deletion, requires pull requests to be current with `main`, and requires all
+review conversations to be resolved. The repository requires an approving
+review when another maintainer is available.
 
 ## Release boundary
 
-Create release tags only from `main`. The publication workflow must use the protected `maven-central` GitHub environment and require manual approval. Validation and upload do not imply permission to publish: the first releases remain pending in Central until a maintainer reviews and publishes them manually.
+A merge to `main` runs CI but does not publish. Release preparation is a
+temporary `release/X.Y.Z` pull request; after its successful post-merge CI
+run, an approved annotated signed `vX.Y.Z` tag on that exact `main` commit
+starts release verification. The Maven version is `X.Y.Z` without the `v`.
 
-Snapshots stay on `dev`; released versions never return to a `-SNAPSHOT` version. Published Maven coordinates are immutable.
+The Release workflow verifies the signed, immutable tagged candidate and the
+full compatibility matrix before it requests approval for the protected
+`maven-central` environment. It does not publish automatically: a maintainer
+inspects the validated Central deployment and publishes it manually. A GitHub
+Release is created only after the public Maven coordinates are available.
 
-See [Contributing](../CONTRIBUTING.md) for local checks and [Architecture](architecture.md) for module boundaries.
+Published Maven coordinates and release tags are immutable. After publication,
+a temporary `chore/next-snapshot` pull request advances `main` to the next
+planned snapshot.
+
+See [Contributing](../CONTRIBUTING.md) for local checks, [Releasing](../RELEASING.md)
+for release operations, and [Architecture](architecture.md) for module
+boundaries.
