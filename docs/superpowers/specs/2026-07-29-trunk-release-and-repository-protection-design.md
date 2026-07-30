@@ -1,5 +1,9 @@
 # CriteriaForge Trunk, Release, and Repository Protection Design
 
+> Superseded on 2026-07-30 by the approved release-only `main` model. Retained as historical context; do not execute this document.
+>
+> Approved replacement: [`docs/superpowers/specs/2026-07-30-release-only-main-model-design.md`](2026-07-30-release-only-main-model-design.md)
+
 **Status:** Approved
 **Date:** 2026-07-29
 
