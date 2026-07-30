@@ -63,14 +63,13 @@ No approving review is required while only one eligible maintainer exists. Every
 
 `protect-dev` is active, blocks deletion, and has no bypass actor. The reset is an exceptional maintainer operation, not a direct-push exception. Run this only after the release has completed its required post-merge checks and manual Central publication. Do not start if the SHA/tree or open-pull-request checks fail.
 
-The following procedure temporarily disables only the live ruleset named `protect-dev`, records its full definition, recreates `dev` at the verified `main` commit, and restores the saved definition even if deletion or recreation fails. It requires an authenticated maintainer GitHub CLI session; replace `REPOSITORY` only when operating the intended repository.
+The following procedure temporarily disables only the live ruleset named `protect-dev`, records its full definition, recreates `dev` at the verified `main` commit, and restores the saved definition even if deletion or recreation fails. Cleanup re-queries that exact ruleset whenever its saved payload exists; any state other than `active`, including an empty result from an ambiguous API failure, triggers restoration. It requires an authenticated maintainer GitHub CLI session; replace `REPOSITORY` only when operating the intended repository.
 
 ```bash
 set -euo pipefail
 
 REPOSITORY="EmmanuelCazarez/criteriaforge"
 RESET_DIR="$(mktemp -d)"
-RULESET_DISABLED=0
 
 restore_protect_dev() {
   jq '.enforcement = "active" | {name, target, enforcement, bypass_actors, conditions, rules}' \
@@ -81,10 +80,20 @@ restore_protect_dev() {
 
 cleanup() {
   status=$?
-  if [[ "${RULESET_DISABLED}" == "1" ]]; then
-    restore_protect_dev
+  local live_enforcement
+  set +e
+  if [[ -n "${RULESET_ID:-}" && -s "${RESET_DIR}/protect-dev-before.json" ]]; then
+    live_enforcement="$(gh api "repos/${REPOSITORY}/rulesets/${RULESET_ID}" --jq '.enforcement' 2>/dev/null)"
+    if [[ "${live_enforcement}" != "active" ]]; then
+      if ! restore_protect_dev; then
+        printf 'ERROR: could not restore protect-dev; saved payload retained at %s\n' "${RESET_DIR}" >&2
+        trap - EXIT
+        exit "${status}"
+      fi
+    fi
   fi
   rm -rf "${RESET_DIR}"
+  trap - EXIT
   exit "${status}"
 }
 trap cleanup EXIT
@@ -110,7 +119,6 @@ jq '.enforcement = "disabled" | {name, target, enforcement, bypass_actors, condi
   "${RESET_DIR}/protect-dev-before.json" > "${RESET_DIR}/protect-dev-disabled.json"
 gh api --method PUT "repos/${REPOSITORY}/rulesets/${RULESET_ID}" \
   --input "${RESET_DIR}/protect-dev-disabled.json" >/dev/null
-RULESET_DISABLED=1
 test "$(gh api "repos/${REPOSITORY}/rulesets/${RULESET_ID}" --jq '.enforcement')" = "disabled"
 
 gh api --method DELETE "repos/${REPOSITORY}/git/refs/heads/dev" >/dev/null
@@ -119,12 +127,27 @@ gh api --method POST "repos/${REPOSITORY}/git/refs" \
 test "$(gh api "repos/${REPOSITORY}/branches/dev" --jq '.commit.sha')" = "${MAIN_COMMIT}"
 
 restore_protect_dev
-RULESET_DISABLED=0
 jq -e '.name == "protect-dev" and .target == "branch" and .enforcement == "active" and .bypass_actors == [] and .conditions.ref_name.include == ["refs/heads/dev"] and any(.rules[]; .type == "deletion")' \
   <(gh api "repos/${REPOSITORY}/rulesets/${RULESET_ID}") >/dev/null
 ```
 
 If any command before deletion fails, the procedure changes nothing. If a command after the temporary disable fails, the exit trap restores the exact saved `protect-dev` definition before it exits. If the restoration API call itself fails, stop all release work and reapply the recorded active ruleset definition before any further action. Do not continue to the next-snapshot pull request until the final active-ruleset and recreated-branch checks pass.
+
+A focused static assertion for the ambiguous-disable recovery path is:
+
+```bash
+cleanup_body="$(sed -n '/^cleanup()/,/^}/p' docs/branching.md)"
+printf '%s\n' "${cleanup_body}" | rg -q '\-n "\$\{RULESET_ID:-\}"'
+printf '%s\n' "${cleanup_body}" | rg -q '\-s "\$\{RESET_DIR\}/protect-dev-before\.json"'
+printf '%s\n' "${cleanup_body}" | rg -q 'live_enforcement=.*gh api'
+printf '%s\n' "${cleanup_body}" | rg -q 'if \[\[ "\$\{live_enforcement\}" != "active" \]\]; then'
+printf '%s\n' "${cleanup_body}" | rg -q 'restore_protect_dev'
+if printf '%s\n' "${cleanup_body}" | rg -q 'RULESET_DISABLED'; then
+  exit 1
+fi
+printf 'ambiguous-disable-static-assertion=pass\n'
+```
+
 
 ## Release lifecycle
 
