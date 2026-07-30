@@ -83,7 +83,7 @@ Follow this sequence exactly:
 
 11. Let the tag push trigger `Release`. It validates the signed candidate and uploads the intended Maven Central artifacts through its protected `maven-central` job. `workflow_dispatch` may rerun an existing signed tag, but it does not replace that tag. A merge to `main` alone never publishes.
 12. Approve the protected environment when the workflow requests it, inspect the Central deployment at `VALIDATED`, and publish it manually. Confirm every module, coordinate, POM, source JAR, Javadoc JAR, signature, license, SCM URL, and validation message before selecting **Publish**.
-13. Delete `dev` in the controlled release operation and recreate it from the new `main` tip.
+13. Run the failure-safe [`dev` reset procedure](docs/branching.md#controlled-dev-reset-after-a-release). It records and checks the release `main` SHA/tree and open pull requests, disables only exact `protect-dev`, recreates `dev` at the verified `main` commit, restores the ruleset immediately, and verifies protection again.
 14. Create a short-lived `chore/next-snapshot` branch from the recreated `dev`, set the next snapshot version, and squash its pull request back into `dev`.
 
 ## Recovery
