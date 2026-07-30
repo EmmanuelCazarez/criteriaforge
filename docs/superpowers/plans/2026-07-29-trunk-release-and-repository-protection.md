@@ -1,5 +1,9 @@
 # CriteriaForge Trunk, Release, and Repository Protection Implementation Plan
 
+> Superseded on 2026-07-30 by the approved release-only `main` model. Retained as historical context; do not execute this document.
+>
+> Approved replacement: [`docs/superpowers/plans/2026-07-30-release-only-main-model.md`](2026-07-30-release-only-main-model.md)
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make `main` the only permanent CriteriaForge branch, enforce one squash commit per pull request, protect release tags, and publish Maven Central candidates only from verified signed tags after the complete compatibility matrix succeeds.
