@@ -166,9 +166,9 @@ Use `0.2.0` when backward-compatible features are introduced. Fixes and refactor
 
 The repository has three GitHub Actions workflows:
 
-1. **`CI`** runs for pull requests and pushes on `dev` and `main`, plus manual dispatch. It runs policy validation, Java 17/Spring Boot 3, Java 17/Spring Boot 4, PostgreSQL, quality, and dependency review.
+1. **`CI`** runs for pull requests and pushes on `dev` and `main`, plus manual dispatch. Java 17/Spring Boot 3, Java 17/Spring Boot 4, PostgreSQL, and quality run for those triggers; policy validation and dependency review are pull-request-only.
 2. **`CodeQL`** runs for pull requests and pushes on `dev` and `main`, on its weekly schedule, and through manual dispatch.
-3. **`Release`** runs for pushed signed `v*.*.*` tags and can be manually rerun only for an existing signed version. A merge to `main` alone does not publish. Its protected `maven-central` job uploads the signed bundle; Maven Central publication remains a separate manual approval.
+3. **`Release`** runs for pushed signed `v*.*.*` tags and can be manually rerun only for an existing signed version. A merge to `main` alone does not publish. Its `publish` job, protected by the `maven-central` environment, uploads the signed bundle; Maven Central publication remains a separate manual approval.
 
 Dependabot is separate from those three GitHub Actions workflows. It creates weekly Maven and GitHub Actions update pull requests targeting `dev`.
 
