@@ -9,7 +9,7 @@ record Condition(String field, Operator operator, List<Object> values)
 
     Condition {
         field = QueryPath.requireValid(field, "field");
-        operator = Objects.requireNonNull(operator, "operator must not be null");
+        Objects.requireNonNull(operator, "operator must not be null");
         Objects.requireNonNull(values, "values must not be null");
         if (values.stream().anyMatch(Objects::isNull)) {
             throw new IllegalArgumentException("condition values must not contain null");

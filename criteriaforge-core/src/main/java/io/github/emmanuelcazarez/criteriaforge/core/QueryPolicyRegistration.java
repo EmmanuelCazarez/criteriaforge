@@ -6,8 +6,8 @@ import java.util.Objects;
 public record QueryPolicyRegistration(Class<?> entityType, QueryPolicy policy) {
 
     public QueryPolicyRegistration {
-        entityType = Objects.requireNonNull(entityType, "entityType must not be null");
-        policy = Objects.requireNonNull(policy, "policy must not be null");
+        Objects.requireNonNull(entityType, "entityType must not be null");
+        Objects.requireNonNull(policy, "policy must not be null");
     }
 
     public static QueryPolicyRegistration forEntity(

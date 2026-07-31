@@ -6,7 +6,7 @@ import java.util.Objects;
 record Negation(FilterExpression expression) implements FilterExpression {
 
     Negation {
-        expression = Objects.requireNonNull(expression, "expression must not be null");
+        Objects.requireNonNull(expression, "expression must not be null");
     }
 
     @Override
