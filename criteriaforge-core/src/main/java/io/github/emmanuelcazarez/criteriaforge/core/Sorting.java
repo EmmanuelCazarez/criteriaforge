@@ -19,8 +19,8 @@ public record Sorting(List<Order> orders) {
 
         public Order {
             field = QueryPath.requireValid(field, "sort field");
-            direction = Objects.requireNonNull(
-                direction, "sort direction must not be null");
+            Objects.requireNonNull(
+                    direction, "sort direction must not be null");
         }
     }
 }
