@@ -154,12 +154,16 @@ Expected: verification passes and the commit contains only the parser and tests.
 Run each command separately and require exit code zero:
 
 ```bash
-./mvnw -q verify
-./mvnw -B -ntp verify -Dspring-boot.version=3.5.16
-./mvnw -B -ntp verify -Dspring-boot.version=4.1.0
-./mvnw -B -ntp -Ppostgresql-tests verify
-./mvnw -B -ntp -Pquality verify
+./mvnw -q clean verify
+./mvnw -B -ntp clean verify -Dspring-boot.version=3.5.16
+./mvnw -B -ntp clean verify -Dspring-boot.version=4.1.0
+./mvnw -B -ntp clean -Ppostgresql-tests verify
+./mvnw -B -ntp clean -Pquality verify
 ```
+
+Each compatibility command starts with `clean` so classes compiled against one
+Spring Boot dependency set cannot be reused against another. The hosted
+PostgreSQL job must report both integration tests as executed, not skipped.
 
 - [ ] **Step 2: Recheck branch freshness and push**
 
