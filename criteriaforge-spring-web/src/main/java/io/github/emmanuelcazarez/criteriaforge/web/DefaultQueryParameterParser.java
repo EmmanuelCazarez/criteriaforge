@@ -103,14 +103,35 @@ public final class DefaultQueryParameterParser implements QueryParameterParser {
     }
 
     private static void select(QueryRequest.Builder builder, String token) {
-        var match = java.util.regex.Pattern
-            .compile("(?i)^(.+?)\\s+as\\s+(.+)$")
-            .matcher(token);
-        if (match.matches()) {
-            builder.selectAs(match.group(1).trim(), match.group(2).trim());
+        var separator = aliasSeparator(token);
+        if (separator >= 0) {
+            builder.selectAs(
+                token.substring(0, separator).trim(),
+                token.substring(separator + 2).trim());
         } else {
             builder.select(token);
         }
+    }
+
+    private static int aliasSeparator(String token) {
+        for (var index = 1; index + 2 < token.length(); index++) {
+            var first = token.charAt(index);
+            var second = token.charAt(index + 1);
+            if ((first == 'a' || first == 'A')
+                    && (second == 's' || second == 'S')
+                    && isAliasWhitespace(token.charAt(index - 1))
+                    && isAliasWhitespace(token.charAt(index + 2))) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isAliasWhitespace(char value) {
+        return switch (value) {
+            case ' ', '\t', '\n', '\u000B', '\f', '\r' -> true;
+            default -> false;
+        };
     }
 
     private static FilterExpression parseFilter(String name, List<String> rawValues) {
