@@ -2,12 +2,14 @@ package io.github.emmanuelcazarez.criteriaforge.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 import io.github.emmanuelcazarez.criteriaforge.core.Filters;
 import io.github.emmanuelcazarez.criteriaforge.core.ProjectionField;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
+import java.time.Duration;
 import org.junit.jupiter.api.Test;
 import org.springframework.util.LinkedMultiValueMap;
 
@@ -130,6 +132,27 @@ class DefaultQueryParameterParserTest {
             ProjectionField.of("id"),
             ProjectionField.aliased("customerName", "buyer.name"),
             ProjectionField.aliased("amount", "orderTotal"));
+    }
+
+    @Test
+    void handlesAdversarialProjectionWhitespaceWithinOneSecond() {
+        var parameters = new LinkedMultiValueMap<String, String>();
+        parameters.add("fields", "a" + " ".repeat(50_000) + "b");
+
+        assertTimeoutPreemptively(Duration.ofSeconds(1), () ->
+            assertThatThrownBy(() -> parser.parse(parameters))
+                .isInstanceOf(IllegalArgumentException.class));
+    }
+
+    @Test
+    void preservesCaseInsensitiveAliasAndNonSpaceWhitespace() {
+        var parameters = new LinkedMultiValueMap<String, String>();
+        parameters.add("fields", "customerName\tAS\tbuyer.name");
+
+        var parsed = parser.parse(parameters);
+
+        assertThat(parsed.fields()).containsExactly(
+            ProjectionField.aliased("customerName", "buyer.name"));
     }
 
     @Test

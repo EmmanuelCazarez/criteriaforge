@@ -17,9 +17,9 @@ public record QueryRequest(
 
     public QueryRequest {
         fields = validateFields(fields);
-        filter = Objects.requireNonNull(filter, "filter must not be null");
-        sorting = Objects.requireNonNull(sorting, "sorting must not be null");
-        pagination = Objects.requireNonNull(pagination, "pagination must not be null");
+        Objects.requireNonNull(filter, "filter must not be null");
+        Objects.requireNonNull(sorting, "sorting must not be null");
+        Objects.requireNonNull(pagination, "pagination must not be null");
     }
 
     public static Builder builder() {

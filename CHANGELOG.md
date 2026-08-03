@@ -4,6 +4,14 @@ All notable changes to CriteriaForge are documented here. The format follows [Ke
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-03
+
+### Security
+
+- Replaced projection-alias regular-expression parsing with a deterministic
+  linear-time scanner to prevent polynomial denial of service from malicious
+  `fields` query parameters.
+
 ## [0.1.0] - 2026-07-28
 
 First public release.
@@ -29,5 +37,6 @@ First public release.
 - Empty sorting now represents a valid query without explicit ordering instead
   of raising an exception.
 
-[Unreleased]: https://github.com/EmmanuelCazarez/criteriaforge/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/EmmanuelCazarez/criteriaforge/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/EmmanuelCazarez/criteriaforge/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/EmmanuelCazarez/criteriaforge/releases/tag/v0.1.0
