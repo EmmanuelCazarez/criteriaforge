@@ -6,7 +6,7 @@
 
     <groupId>io.github.emmanuelcazarez</groupId>
     <artifactId>criteriaforge-parent</artifactId>
-    <version>0.1.1-SNAPSHOT</version>
+    <version>0.1.1</version>
     <packaging>pom</packaging>
 
     <name>CriteriaForge</name>
