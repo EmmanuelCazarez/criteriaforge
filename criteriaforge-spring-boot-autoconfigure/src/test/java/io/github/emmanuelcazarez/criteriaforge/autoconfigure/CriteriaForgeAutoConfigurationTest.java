@@ -41,7 +41,7 @@ class CriteriaForgeAutoConfigurationTest {
             assertThat(context).hasSingleBean(QueryPolicyProvider.class);
             var policy = context.getBean(QueryPolicyProvider.class).policyFor(Object.class);
             assertThat(policy.maxPageSize()).isEqualTo(40);
-            assertThat(policy.allowedFields()).contains("id");
+            assertThat(policy.projectionFields()).contains("id");
         });
     }
 
@@ -144,7 +144,7 @@ class CriteriaForgeAutoConfigurationTest {
         QueryPolicyRegistration objectQueryPolicy() {
             return QueryPolicyRegistration.forEntity(
                 Object.class,
-                QueryPolicy.builder().allowFields("id").maxPageSize(40).build());
+                QueryPolicy.builder().allowProjectionFields("id").maxPageSize(40).build());
         }
     }
 
