@@ -125,4 +125,71 @@ class QueryRequestTest {
         assertThatThrownBy(() -> result.content().add("third"))
             .isInstanceOf(UnsupportedOperationException.class);
     }
+
+    @Test
+    void mapsContentWithoutChangingPaginationMetadata() {
+        var result = new QueryResult<>(List.of(2, 4), 7, 2, 2);
+
+        var mapped = result.map(value -> "item-" + value);
+
+        assertThat(mapped.content()).containsExactly("item-2", "item-4");
+        assertThat(mapped.total()).isEqualTo(7);
+        assertThat(mapped.offset()).isEqualTo(2);
+        assertThat(mapped.limit()).isEqualTo(2);
+    }
+
+    @Test
+    void derivesOffsetNavigationWithoutPageNumbers() {
+        assertThat(new QueryResult<>(List.of("a", "b"), 5, 0, 2).hasNext()).isTrue();
+        assertThat(new QueryResult<>(List.of("c"), 3, 2, 2).hasNext()).isFalse();
+        assertThat(new QueryResult<>(List.of("c"), 3, 2, 2).hasPrevious()).isTrue();
+        assertThat(new QueryResult<>(List.of(), 0, 10, 2).hasPrevious()).isFalse();
+    }
+
+    @Test
+    void rejectsANullResultMapper() {
+        var result = new QueryResult<>(List.of("a"), 1, 0, 1);
+
+        assertThatThrownBy(() -> result.map(null))
+            .isInstanceOf(NullPointerException.class)
+            .hasMessage("mapper must not be null");
+    }
+
+    @Test
+    void addsARequiredFilterWithoutChangingTheIncomingRequest() {
+        var clientFilter = Filters.field("status").eq("PAID");
+        var incoming = QueryRequest.builder()
+            .select("reference")
+            .where(clientFilter)
+            .orderByDescending("createdAt")
+            .offset(20)
+            .limit(10)
+            .build();
+        var required = Filters.field("organizationId").eq(42L);
+
+        var scoped = incoming.andWhere(required);
+
+        assertThat(scoped.fields()).isEqualTo(incoming.fields());
+        assertThat(scoped.sorting()).isEqualTo(incoming.sorting());
+        assertThat(scoped.pagination()).isEqualTo(incoming.pagination());
+        assertThat(scoped.filter()).contains(required.and(clientFilter));
+        assertThat(incoming.filter()).contains(clientFilter);
+    }
+
+    @Test
+    void usesARequiredFilterAsTheOnlyFilterWhenTheRequestHasNone() {
+        var incoming = QueryRequest.builder().limit(10).build();
+        var required = Filters.field("organizationId").eq(42L);
+
+        assertThat(incoming.andWhere(required).filter()).contains(required);
+    }
+
+    @Test
+    void rejectsANullRequiredFilter() {
+        var incoming = QueryRequest.builder().build();
+
+        assertThatThrownBy(() -> incoming.andWhere(null))
+            .isInstanceOf(NullPointerException.class)
+            .hasMessage("requiredFilter must not be null");
+    }
 }
