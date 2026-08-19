@@ -30,6 +30,20 @@ final class JpaSortBuilder {
             .toList();
     }
 
+    Order buildTrusted(
+            String persistentPath,
+            SortDirection direction,
+            Root<?> root,
+            CriteriaBuilder criteriaBuilder,
+            QueryPolicy policy,
+            JoinRegistry joins) {
+        var resolved = pathResolver.resolve(root, persistentPath, joins);
+        validateStructure(resolved, policy, persistentPath);
+        return direction == SortDirection.ASC
+            ? criteriaBuilder.asc(resolved.path())
+            : criteriaBuilder.desc(resolved.path());
+    }
+
     private Order build(
             Sorting.Order sort,
             Root<?> root,
@@ -37,34 +51,46 @@ final class JpaSortBuilder {
             QueryPolicy policy,
             JoinRegistry joins) {
         var resolved = pathResolver.resolve(root, policy.resolveField(sort.field()), joins);
-        if (!policy.isFieldAllowed(sort.field())) {
+        if (!policy.isSortAllowed(sort.field())) {
             throw rejected(QueryErrorCode.FIELD_NOT_ALLOWED, "Sort field is not allowed", sort);
         }
-        if (resolved.relationshipDepth() > 0 && !policy.relationshipTraversal()) {
-            throw rejected(
-                QueryErrorCode.RELATIONSHIP_TRAVERSAL_DISABLED,
-                "Relationship traversal is disabled",
-                sort);
-        }
-        if (resolved.relationshipDepth() > policy.maxDepth()) {
-            throw rejected(
-                QueryErrorCode.RELATIONSHIP_DEPTH_EXCEEDED,
-                "Sort path exceeds maximum relationship depth",
-                sort);
-        }
-        if (resolved.plural()) {
-            throw rejected(
-                QueryErrorCode.UNSUPPORTED_PROJECTION,
-                "Sorting through a to-many relationship is not supported",
-                sort);
-        }
+        validateStructure(resolved, policy, sort.field());
         return sort.direction() == SortDirection.ASC
             ? criteriaBuilder.asc(resolved.path())
             : criteriaBuilder.desc(resolved.path());
     }
 
+    private static void validateStructure(
+            JpaResolvedPath resolved,
+            QueryPolicy policy,
+            String field) {
+        if (resolved.relationshipDepth() > 0 && !policy.relationshipTraversal()) {
+            throw rejected(
+                QueryErrorCode.RELATIONSHIP_TRAVERSAL_DISABLED,
+                "Relationship traversal is disabled",
+                field);
+        }
+        if (resolved.relationshipDepth() > policy.maxDepth()) {
+            throw rejected(
+                QueryErrorCode.RELATIONSHIP_DEPTH_EXCEEDED,
+                "Sort path exceeds maximum relationship depth",
+                field);
+        }
+        if (resolved.plural()) {
+            throw rejected(
+                QueryErrorCode.UNSUPPORTED_PROJECTION,
+                "Sorting through a to-many relationship is not supported",
+                field);
+        }
+    }
+
     private static QueryValidationException rejected(
             QueryErrorCode code, String message, Sorting.Order sort) {
-        return new QueryValidationException(code, message, sort.field());
+        return rejected(code, message, sort.field());
+    }
+
+    private static QueryValidationException rejected(
+            QueryErrorCode code, String message, String field) {
+        return new QueryValidationException(code, message, field);
     }
 }

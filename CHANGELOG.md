@@ -4,6 +4,31 @@ All notable changes to CriteriaForge are documented here. The format follows [Ke
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-19
+
+### Added
+
+- Typed entity execution plus immutable result mapping and offset-window
+  navigation helpers.
+- Immutable mandatory-filter composition with `QueryRequest.andWhere(...)`.
+- Independent projection, filter, and sort allowlists while retaining the
+  deprecated unified field policy for 0.1 compatibility.
+- Configurable projection and sort complexity limits with stable validation
+  error codes.
+- Deterministic pagination ordering through primary-key or policy-defined
+  tie-breakers.
+
+### Fixed
+
+- Entity pagination across plural joins now de-duplicates identifiers before
+  loading and restoring the ordered page.
+- Distinct projections retain hidden ordering selections without exposing them
+  in projection output.
+
+### Changed
+
+- Updated ArchUnit from 1.4.2 to 1.5.0 and CodeQL Action from 4.37.3 to 4.37.6.
+
 ## [0.1.1] - 2026-08-03
 
 ### Security
@@ -37,6 +62,7 @@ First public release.
 - Empty sorting now represents a valid query without explicit ordering instead
   of raising an exception.
 
-[Unreleased]: https://github.com/EmmanuelCazarez/criteriaforge/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/EmmanuelCazarez/criteriaforge/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/EmmanuelCazarez/criteriaforge/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/EmmanuelCazarez/criteriaforge/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/EmmanuelCazarez/criteriaforge/releases/tag/v0.1.0
