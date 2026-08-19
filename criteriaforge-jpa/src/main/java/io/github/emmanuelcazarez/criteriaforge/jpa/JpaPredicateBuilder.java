@@ -119,7 +119,7 @@ final class JpaPredicateBuilder {
 
     private static void validatePolicy(
             String field, Operator operator, JpaResolvedPath resolved, QueryPolicy policy) {
-        if (!policy.isFieldAllowed(field)) {
+        if (!policy.isFilterAllowed(field)) {
             throw new QueryValidationException(
                 QueryErrorCode.FIELD_NOT_ALLOWED,
                 "Field is not allowed by the query policy",

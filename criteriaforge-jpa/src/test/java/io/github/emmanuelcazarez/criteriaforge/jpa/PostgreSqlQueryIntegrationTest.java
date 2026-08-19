@@ -121,6 +121,49 @@ class PostgreSqlQueryIntegrationTest {
         assertThat(result.limit()).isEqualTo(1);
     }
 
+    @Test
+    void pagesDistinctEntitiesWithAToOneTieBreaker() {
+        var product = new ProductEntity("Tie Widget");
+        var amy = new CustomerEntity("Amy", "MX");
+        var zoe = new CustomerEntity("Zoe", "MX");
+        entityManager.persist(product);
+        entityManager.persist(amy);
+        entityManager.persist(zoe);
+        var firstItem = new OrderItemEntity(product);
+        var duplicateItem = new OrderItemEntity(product);
+        var secondItem = new OrderItemEntity(product);
+        entityManager.persist(firstItem);
+        entityManager.persist(duplicateItem);
+        entityManager.persist(secondItem);
+        var orderedFirst = order(
+            "ORDERED-FIRST", "10", amy, OffsetDateTime.parse("2026-08-01T00:00:00Z"));
+        orderedFirst.addItem(firstItem);
+        orderedFirst.addItem(duplicateItem);
+        var orderedSecond = order(
+            "ORDERED-SECOND", "20", zoe, OffsetDateTime.parse("2026-08-02T00:00:00Z"));
+        orderedSecond.addItem(secondItem);
+        entityManager.persist(orderedFirst);
+        entityManager.persist(orderedSecond);
+        entityManager.flush();
+        entityManager.clear();
+
+        var policy = QueryPolicy.builder()
+            .relationshipTraversal(true)
+            .tieBreaker("customer.name")
+            .build();
+        var publicExecutor = new JpaQueryEngine(entityManager, ignored -> policy);
+        var query = QueryRequest.builder()
+            .where(Filters.field("items.product.name").eq("Tie Widget"))
+            .limit(10)
+            .build();
+
+        var result = publicExecutor.findAll(OrderEntity.class, query);
+
+        assertThat(result.content()).extracting(OrderEntity::getReference)
+            .containsExactly("ORDERED-FIRST", "ORDERED-SECOND");
+        assertThat(result.total()).isEqualTo(2);
+    }
+
     private static OrderEntity order(
             String reference,
             String total,

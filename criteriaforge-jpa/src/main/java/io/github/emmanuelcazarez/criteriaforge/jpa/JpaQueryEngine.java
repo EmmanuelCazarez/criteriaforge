@@ -7,6 +7,7 @@ import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryResult;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
+import io.github.emmanuelcazarez.criteriaforge.core.SortDirection;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
 import jakarta.persistence.criteria.From;
@@ -54,6 +55,11 @@ public final class JpaQueryEngine implements QueryEngine {
             : findProjected(entityType, query);
     }
 
+    @Override
+    public <T> QueryResult<T> executeEntities(Class<T> entityType, QueryRequest query) {
+        return findAll(entityType, query);
+    }
+
     <T> QueryResult<T> findAll(Class<T> entityType, QueryRequest query) {
         Objects.requireNonNull(entityType, "entityType must not be null");
         Objects.requireNonNull(query, "query must not be null");
@@ -68,7 +74,6 @@ public final class JpaQueryEngine implements QueryEngine {
         complexityValidator.validate(query, policy);
         policyValidator.validate(entityType, query, policy);
         var pagination = query.pagination().orElse(new Pagination(0, policy.maxPageSize()));
-        var sortOrders = query.sorting().orders();
 
         var criteriaBuilder = entityManager.getCriteriaBuilder();
         var contentQuery = criteriaBuilder.createQuery(entityType);
@@ -78,18 +83,23 @@ public final class JpaQueryEngine implements QueryEngine {
         query.filter().ifPresent(expression -> contentQuery.where(predicateBuilder.build(
             expression, contentRoot, criteriaBuilder, policy, contentJoins)));
 
-        if (sortOrders.isEmpty()) {
-            contentQuery.orderBy(criteriaBuilder.asc(contentRoot.get(identifierName(entityType))));
+        List<T> content;
+        if (hasPluralJoin(contentRoot)) {
+            content = findDistinctPage(entityType, query, policy, pagination);
         } else {
-            contentQuery.orderBy(sortBuilder.build(
-                sortOrders, contentRoot, criteriaBuilder, policy, contentJoins));
+            var effectiveSort = effectiveSort(
+                entityType,
+                query.sorting().orders(),
+                contentRoot,
+                criteriaBuilder,
+                policy,
+                contentJoins);
+            contentQuery.orderBy(effectiveSort.orders());
+            content = entityManager.createQuery(contentQuery)
+                .setFirstResult(pagination.offset())
+                .setMaxResults(pagination.limit())
+                .getResultList();
         }
-        contentQuery.distinct(hasPluralJoin(contentRoot));
-
-        var content = entityManager.createQuery(contentQuery)
-            .setFirstResult(pagination.offset())
-            .setMaxResults(pagination.limit())
-            .getResultList();
         var total = count(entityType, query, policy);
         return new QueryResult<>(
             content, total, pagination.offset(), pagination.limit());
@@ -110,7 +120,6 @@ public final class JpaQueryEngine implements QueryEngine {
         complexityValidator.validate(query, policy);
         policyValidator.validate(entityType, query, policy);
         var pagination = query.pagination().orElse(new Pagination(0, policy.maxPageSize()));
-        var sortOrders = query.sorting().orders();
 
         var criteriaBuilder = entityManager.getCriteriaBuilder();
         var contentQuery = criteriaBuilder.createTupleQuery();
@@ -120,25 +129,26 @@ public final class JpaQueryEngine implements QueryEngine {
             query.fields(), contentRoot, policy, contentJoins));
         query.filter().ifPresent(expression -> contentQuery.where(predicateBuilder.build(
             expression, contentRoot, criteriaBuilder, policy, contentJoins)));
-        List<Order> orders = sortOrders.isEmpty()
-            ? List.of(criteriaBuilder.asc(contentRoot.get(identifierName(entityType))))
-            : sortBuilder.build(
-                sortOrders, contentRoot, criteriaBuilder, policy, contentJoins);
+        var effectiveSort = effectiveSort(
+            entityType,
+            query.sorting().orders(),
+            contentRoot,
+            criteriaBuilder,
+            policy,
+            contentJoins);
         var distinct = hasPluralJoin(contentRoot);
         if (distinct) {
             var selectedSources = query.fields().stream()
                 .map(field -> policy.resolveField(field.source()))
                 .collect(Collectors.toUnmodifiableSet());
-            var sortSources = sortOrders.isEmpty()
-                ? List.of(identifierName(entityType))
-                : sortOrders.stream()
-                    .map(sort -> policy.resolveField(sort.field()))
-                    .toList();
             addHiddenSortSelections(
-                selections, orders, sortSources, selectedSources);
+                selections,
+                effectiveSort.orders(),
+                effectiveSort.persistentPaths(),
+                selectedSources);
         }
-        contentQuery.multiselect(selections);
-        contentQuery.orderBy(orders);
+        contentQuery.multiselect(selections.toArray(Selection<?>[]::new));
+        contentQuery.orderBy(effectiveSort.orders());
         contentQuery.distinct(distinct);
 
         var content = entityManager.createQuery(contentQuery)
@@ -184,6 +194,94 @@ public final class JpaQueryEngine implements QueryEngine {
         return entityManager.createQuery(countQuery).getSingleResult();
     }
 
+    private <T> List<T> findDistinctPage(
+            Class<T> entityType,
+            QueryRequest query,
+            QueryPolicy policy,
+            Pagination pagination) {
+        var criteriaBuilder = entityManager.getCriteriaBuilder();
+        var idQuery = criteriaBuilder.createTupleQuery();
+        var idRoot = idQuery.from(entityType);
+        var idJoins = new JoinRegistry(idRoot);
+        query.filter().ifPresent(expression -> idQuery.where(predicateBuilder.build(
+            expression, idRoot, criteriaBuilder, policy, idJoins)));
+        var effectiveSort = effectiveSort(
+            entityType,
+            query.sorting().orders(),
+            idRoot,
+            criteriaBuilder,
+            policy,
+            idJoins);
+        var identifier = identifierName(entityType);
+        var selections = new ArrayList<Selection<?>>();
+        selections.add(idRoot.get(identifier));
+        var selectedPaths = new java.util.LinkedHashSet<String>();
+        selectedPaths.add(identifier);
+        for (int index = 0; index < effectiveSort.orders().size(); index++) {
+            if (selectedPaths.add(effectiveSort.persistentPaths().get(index))) {
+                selections.add(effectiveSort.orders().get(index).getExpression());
+            }
+        }
+        idQuery.multiselect(selections.toArray(Selection<?>[]::new));
+        idQuery.orderBy(effectiveSort.orders());
+        idQuery.distinct(true);
+
+        var identifiers = entityManager.createQuery(idQuery)
+            .setFirstResult(pagination.offset())
+            .setMaxResults(pagination.limit())
+            .getResultList().stream()
+            .map(tuple -> tuple.get(0))
+            .toList();
+        if (identifiers.isEmpty()) {
+            return List.of();
+        }
+
+        var entityQuery = criteriaBuilder.createQuery(entityType);
+        var entityRoot = entityQuery.from(entityType);
+        entityQuery.select(entityRoot).where(entityRoot.get(identifier).in(identifiers));
+        var entities = entityManager.createQuery(entityQuery).getResultList();
+        var persistenceUnit = entityManager.getEntityManagerFactory().getPersistenceUnitUtil();
+        var entitiesById = entities.stream().collect(Collectors.toMap(
+            persistenceUnit::getIdentifier,
+            entity -> entity));
+        return identifiers.stream().map(entitiesById::get).toList();
+    }
+
+    private EffectiveSort effectiveSort(
+            Class<?> entityType,
+            List<io.github.emmanuelcazarez.criteriaforge.core.Sorting.Order> requestedSorts,
+            Root<?> root,
+            jakarta.persistence.criteria.CriteriaBuilder criteriaBuilder,
+            QueryPolicy policy,
+            JoinRegistry joins) {
+        var orders = new ArrayList<>(sortBuilder.build(
+            requestedSorts, root, criteriaBuilder, policy, joins));
+        var persistentPaths = requestedSorts.stream()
+            .map(sort -> policy.resolveField(sort.field()))
+            .collect(Collectors.toCollection(ArrayList::new));
+        var tieBreaker = resolvedTieBreaker(entityType, policy);
+        if (!persistentPaths.contains(tieBreaker.persistentPath())) {
+            orders.add(sortBuilder.buildTrusted(
+                tieBreaker.persistentPath(),
+                tieBreaker.direction(),
+                root,
+                criteriaBuilder,
+                policy,
+                joins));
+            persistentPaths.add(tieBreaker.persistentPath());
+        }
+        return new EffectiveSort(List.copyOf(orders), List.copyOf(persistentPaths));
+    }
+
+    private ResolvedTieBreaker resolvedTieBreaker(
+            Class<?> entityType, QueryPolicy policy) {
+        return policy.tieBreaker()
+            .map(order -> new ResolvedTieBreaker(
+                policy.resolveField(order.field()), order.direction()))
+            .orElseGet(() -> new ResolvedTieBreaker(
+                identifierName(entityType), SortDirection.ASC));
+    }
+
     private String identifierName(Class<?> entityType) {
         try {
             var entity = entityManager.getMetamodel().entity(entityType);
@@ -205,5 +303,11 @@ public final class JpaQueryEngine implements QueryEngine {
             }
         }
         return false;
+    }
+
+    private record EffectiveSort(List<Order> orders, List<String> persistentPaths) {
+    }
+
+    private record ResolvedTieBreaker(String persistentPath, SortDirection direction) {
     }
 }

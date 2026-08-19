@@ -26,6 +26,15 @@ public record QueryRequest(
         return new Builder();
     }
 
+    /** Returns a copy whose filter requires {@code requiredFilter} in addition to this query. */
+    public QueryRequest andWhere(FilterExpression requiredFilter) {
+        Objects.requireNonNull(requiredFilter, "requiredFilter must not be null");
+        var combined = filter
+            .map(requiredFilter::and)
+            .orElse(requiredFilter);
+        return new QueryRequest(fields, Optional.of(combined), sorting, pagination);
+    }
+
     private static List<ProjectionField> validateFields(List<ProjectionField> requestedFields) {
         Objects.requireNonNull(requestedFields, "fields must not be null");
         var validated = requestedFields.stream()

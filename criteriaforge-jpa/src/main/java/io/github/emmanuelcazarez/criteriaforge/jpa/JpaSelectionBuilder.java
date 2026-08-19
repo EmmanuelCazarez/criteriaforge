@@ -32,7 +32,7 @@ final class JpaSelectionBuilder {
             ProjectionField projection, Root<?> root, QueryPolicy policy, JoinRegistry joins) {
         var field = projection.source();
         var resolved = pathResolver.resolve(root, policy.resolveField(field), joins);
-        if (!policy.isFieldAllowed(field)) {
+        if (!policy.isProjectionAllowed(field)) {
             throw rejected(QueryErrorCode.FIELD_NOT_ALLOWED, "Projection field is not allowed", field);
         }
         if (resolved.relationshipDepth() > 0 && !policy.relationshipTraversal()) {
