@@ -7,6 +7,7 @@ import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 
 class ConsumerApiTest {
@@ -26,6 +27,17 @@ class ConsumerApiTest {
         var execute = engineType.orElseThrow().getMethod(
             "execute", Class.class, requestType.orElseThrow());
         assertThat(execute.getReturnType()).isEqualTo(QueryResult.class);
+        var executeEntities = engineType.orElseThrow().getMethod(
+            "executeEntities", Class.class, requestType.orElseThrow());
+        assertThat(executeEntities.getReturnType()).isEqualTo(QueryResult.class);
+        assertThat(QueryResult.class.getMethod("map", Function.class)).isNotNull();
+        assertThat(QueryResult.class.getMethod("hasNext")).isNotNull();
+        assertThat(QueryResult.class.getMethod("hasPrevious")).isNotNull();
+        assertThat(requestType.orElseThrow()
+            .getMethod("andWhere", load(
+                "io.github.emmanuelcazarez.criteriaforge.core.FilterExpression")
+                .orElseThrow()))
+            .isNotNull();
 
         assertThat(load("io.github.emmanuelcazarez.criteriaforge.core.QuerySpec")).isEmpty();
         assertThat(load("io.github.emmanuelcazarez.criteriaforge.jpa.CriteriaForgeExecutor"))

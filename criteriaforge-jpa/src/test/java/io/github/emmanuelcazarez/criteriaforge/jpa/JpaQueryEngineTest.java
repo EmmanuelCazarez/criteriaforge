@@ -7,7 +7,9 @@ import io.github.emmanuelcazarez.criteriaforge.core.Filters;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryErrorCode;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryPolicy;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryRequest;
+import io.github.emmanuelcazarez.criteriaforge.core.QueryResult;
 import io.github.emmanuelcazarez.criteriaforge.core.QueryValidationException;
+import io.github.emmanuelcazarez.criteriaforge.core.SortDirection;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.CustomerEntity;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.OrderEntity;
 import io.github.emmanuelcazarez.criteriaforge.jpa.model.OrderItemEntity;
@@ -79,6 +81,78 @@ class JpaQueryEngineTest {
     }
 
     @Test
+    void executesEntitiesWithAStaticallyTypedResult() {
+        var result = executor.executeEntities(
+            OrderEntity.class,
+            QueryRequest.builder().limit(10).build());
+
+        QueryResult<String> references = result.map(OrderEntity::getReference);
+
+        assertThat(references.content())
+            .containsExactly("FIRST", "SECOND", "THIRD", "FOURTH");
+    }
+
+    @Test
+    void typedEntityExecutionRejectsProjectionRequests() {
+        var query = QueryRequest.builder().select("reference").limit(10).build();
+
+        assertThatThrownBy(() -> executor.executeEntities(OrderEntity.class, query))
+            .isInstanceOfSatisfying(QueryValidationException.class, error ->
+                assertThat(error.code()).isEqualTo(QueryErrorCode.UNSUPPORTED_PROJECTION));
+    }
+
+    @Test
+    void appendsThePrimaryKeyToCallerSorting() {
+        var query = QueryRequest.builder()
+            .orderByAscending("status")
+            .limit(10)
+            .build();
+
+        var result = executor.findAll(OrderEntity.class, query);
+
+        assertThat(result.content())
+            .extracting(OrderEntity::getOrderKey)
+            .isSorted();
+    }
+
+    @Test
+    void usesAConfiguredTieBreakerAfterCallerSorting() {
+        var policy = QueryPolicy.builder()
+            .allowSortFields("status")
+            .tieBreaker("reference", SortDirection.DESC)
+            .build();
+        var publicExecutor = new JpaQueryEngine(entityManager, ignored -> policy);
+        var query = QueryRequest.builder()
+            .orderByAscending("status")
+            .limit(20)
+            .build();
+
+        var result = publicExecutor.findAll(OrderEntity.class, query);
+
+        assertThat(result.content()).extracting(OrderEntity::getReference)
+            .containsExactly("THIRD", "SECOND", "FOURTH", "FIRST");
+    }
+
+    @Test
+    void callerDirectionWinsForAnAliasedTieBreakerPath() {
+        var policy = QueryPolicy.builder()
+            .alias("amount", "total")
+            .allowSortFields("total")
+            .tieBreaker("amount", SortDirection.DESC)
+            .build();
+        var publicExecutor = new JpaQueryEngine(entityManager, ignored -> policy);
+        var query = QueryRequest.builder()
+            .orderByAscending("total")
+            .limit(20)
+            .build();
+
+        var result = publicExecutor.findAll(OrderEntity.class, query);
+
+        assertThat(result.content()).extracting(OrderEntity::getReference)
+            .containsExactly("FIRST", "SECOND", "THIRD", "FOURTH");
+    }
+
+    @Test
     void returnsDistinctRootsAndCountsForPluralRelationshipFilters() {
         var widget = new ProductEntity("Widget");
         entityManager.persist(widget);
@@ -105,6 +179,47 @@ class JpaQueryEngineTest {
         assertThat(result.content()).extracting(OrderEntity::getReference)
             .containsExactly("WITH-TWO-WIDGETS");
         assertThat(result.total()).isEqualTo(1);
+    }
+
+    @Test
+    void pagesDistinctEntitiesWithAToOneTieBreaker() {
+        var product = new ProductEntity("Tie Widget");
+        var amy = new CustomerEntity("Amy", "MX");
+        var zoe = new CustomerEntity("Zoe", "MX");
+        entityManager.persist(product);
+        entityManager.persist(amy);
+        entityManager.persist(zoe);
+        var firstItem = new OrderItemEntity(product);
+        var duplicateItem = new OrderItemEntity(product);
+        var secondItem = new OrderItemEntity(product);
+        entityManager.persist(firstItem);
+        entityManager.persist(duplicateItem);
+        entityManager.persist(secondItem);
+        var orderedFirst = order("ORDERED-FIRST", "10.00", amy);
+        orderedFirst.addItem(firstItem);
+        orderedFirst.addItem(duplicateItem);
+        var orderedSecond = order("ORDERED-SECOND", "20.00", zoe);
+        orderedSecond.addItem(secondItem);
+        entityManager.persist(orderedFirst);
+        entityManager.persist(orderedSecond);
+        entityManager.flush();
+        entityManager.clear();
+
+        var policy = QueryPolicy.builder()
+            .relationshipTraversal(true)
+            .tieBreaker("customer.name")
+            .build();
+        var publicExecutor = new JpaQueryEngine(entityManager, ignored -> policy);
+        var query = QueryRequest.builder()
+            .where(Filters.field("items.product.name").eq("Tie Widget"))
+            .limit(10)
+            .build();
+
+        var result = publicExecutor.findAll(OrderEntity.class, query);
+
+        assertThat(result.content()).extracting(OrderEntity::getReference)
+            .containsExactly("ORDERED-FIRST", "ORDERED-SECOND");
+        assertThat(result.total()).isEqualTo(2);
     }
 
     @Test
