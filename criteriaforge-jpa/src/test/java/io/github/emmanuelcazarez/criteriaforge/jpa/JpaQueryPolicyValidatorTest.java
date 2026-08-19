@@ -1,6 +1,7 @@
 package io.github.emmanuelcazarez.criteriaforge.jpa;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.emmanuelcazarez.criteriaforge.core.Filters;
@@ -91,6 +92,84 @@ class JpaQueryPolicyValidatorTest {
             QueryRequest.builder().select("items.product.name").build(),
             QueryPolicy.builder().relationshipTraversal(true).build(),
             QueryErrorCode.UNSUPPORTED_PROJECTION);
+    }
+
+    @Test
+    void validatesEachOperationWithItsOwnPermission() {
+        var policy = QueryPolicy.builder()
+            .allowProjectionFields("reference")
+            .allowFilterFields("status")
+            .allowSortFields("createdAt")
+            .build();
+        var query = QueryRequest.builder()
+            .select("reference")
+            .where(Filters.field("status").eq("PAID"))
+            .orderByAscending("createdAt")
+            .limit(10)
+            .build();
+        var executor = new JpaQueryEngine(entityManager, ignored -> policy);
+
+        assertThatCode(() -> executor.findProjected(OrderEntity.class, query))
+            .doesNotThrowAnyException();
+    }
+
+    @Test
+    void projectionPermissionDoesNotGrantFilterOrSortPermission() {
+        var policy = QueryPolicy.builder()
+            .allowProjectionFields("reference")
+            .allowFilterFields("status")
+            .allowSortFields("createdAt")
+            .build();
+
+        assertRejected(
+            QueryRequest.builder().where(Filters.field("reference").eq("A")).build(),
+            policy,
+            QueryErrorCode.FIELD_NOT_ALLOWED);
+        assertRejected(
+            QueryRequest.builder().orderByAscending("reference").build(),
+            policy,
+            QueryErrorCode.FIELD_NOT_ALLOWED);
+    }
+
+    @Test
+    void filterPermissionDoesNotGrantProjectionPermission() {
+        var policy = QueryPolicy.builder()
+            .allowProjectionFields("reference")
+            .allowFilterFields("status")
+            .build();
+
+        assertRejected(
+            QueryRequest.builder().select("status").build(),
+            policy,
+            QueryErrorCode.FIELD_NOT_ALLOWED);
+    }
+
+    @Test
+    void rejectsAToManyConfiguredTieBreakerBeforeExecutingSql() {
+        var policy = QueryPolicy.builder()
+            .relationshipTraversal(true)
+            .tieBreaker("items.product.name")
+            .build();
+
+        assertRejected(
+            QueryRequest.builder().limit(10).build(),
+            policy,
+            QueryErrorCode.UNSUPPORTED_PROJECTION);
+    }
+
+    @Test
+    void trustsAConfiguredTieBreakerWithoutGrantingCallerAccess() {
+        var policy = QueryPolicy.builder()
+            .allowSortFields("reference")
+            .denyFields("secretNote")
+            .tieBreaker("secretNote")
+            .build();
+        var executor = new JpaQueryEngine(entityManager, ignored -> policy);
+
+        assertThatCode(() -> executor.findAll(
+            OrderEntity.class,
+            QueryRequest.builder().orderByAscending("reference").limit(10).build()))
+            .doesNotThrowAnyException();
     }
 
     private void assertRejected(

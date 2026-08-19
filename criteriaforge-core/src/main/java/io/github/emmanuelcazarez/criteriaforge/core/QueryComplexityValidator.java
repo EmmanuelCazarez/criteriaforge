@@ -10,6 +10,8 @@ public final class QueryComplexityValidator {
         Objects.requireNonNull(policy, "policy must not be null");
 
         query.pagination().ifPresent(pagination -> validatePagination(pagination, policy));
+        validateProjectionFields(query, policy);
+        validateSortFields(query, policy);
         var conditions = query.filter().map(this::countConditions).orElse(0);
         if (conditions > policy.maxConditions()) {
             throw new QueryValidationException(
@@ -26,6 +28,26 @@ public final class QueryComplexityValidator {
                 "Requested limit " + pagination.limit() + " exceeds maximum "
                     + policy.maxPageSize(),
                 "limit");
+        }
+    }
+
+    private static void validateProjectionFields(QueryRequest query, QueryPolicy policy) {
+        if (query.fields().size() > policy.maxProjectionFields()) {
+            throw new QueryValidationException(
+                QueryErrorCode.PROJECTION_LIMIT_EXCEEDED,
+                "Query contains " + query.fields().size() + " projection fields; maximum is "
+                    + policy.maxProjectionFields(),
+                "fields");
+        }
+    }
+
+    private static void validateSortFields(QueryRequest query, QueryPolicy policy) {
+        if (query.sorting().orders().size() > policy.maxSortFields()) {
+            throw new QueryValidationException(
+                QueryErrorCode.SORT_LIMIT_EXCEEDED,
+                "Query contains " + query.sorting().orders().size() + " sort fields; maximum is "
+                    + policy.maxSortFields(),
+                "sort");
         }
     }
 

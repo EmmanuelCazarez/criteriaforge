@@ -18,8 +18,14 @@ class ExampleConfiguration {
     @Bean
     QueryPolicyRegistration exampleOrderQueryPolicy() {
         var policy = QueryPolicy.builder()
+            .allowProjectionFields(
+                "id", "reference", "total", "customer.name", "amount", "buyerName")
+            .allowFilterFields("status", "total", "amount", "customer.country")
+            .allowSortFields("reference", "total", "amount")
             .relationshipTraversal(true)
             .maxPageSize(100)
+            .maxProjectionFields(10)
+            .maxSortFields(3)
             .alias("amount", "total")
             .alias("buyerName", "customer.name")
             .build();

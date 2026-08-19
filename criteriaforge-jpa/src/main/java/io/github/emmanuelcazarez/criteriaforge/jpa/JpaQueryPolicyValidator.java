@@ -33,6 +33,8 @@ final class JpaQueryPolicyValidator {
         query.fields().forEach(field -> validateProjection(entityType, field.source(), policy));
         query.sorting().orders()
             .forEach(order -> validateSort(entityType, order.field(), policy));
+        policy.tieBreaker()
+            .ifPresent(order -> validateTieBreaker(entityType, order.field(), policy));
     }
 
     private void validateFilter(
@@ -41,7 +43,12 @@ final class JpaQueryPolicyValidator {
             @Override
             public Void condition(String field, Operator operator, List<Object> values) {
                 var metadata = resolve(entityType, policy.resolveField(field));
-                validateCommon(field, metadata, policy);
+                validateCommon(
+                    field,
+                    metadata,
+                    policy,
+                    policy.isFilterAllowed(field),
+                    "Filter field is not allowed");
                 if (!policy.isOperatorAllowed(field, operator)) {
                     throw rejected(
                         QueryErrorCode.UNSUPPORTED_OPERATOR,
@@ -77,7 +84,12 @@ final class JpaQueryPolicyValidator {
 
     private void validateProjection(Class<?> entityType, String field, QueryPolicy policy) {
         var metadata = resolve(entityType, policy.resolveField(field));
-        validateCommon(field, metadata, policy);
+        validateCommon(
+            field,
+            metadata,
+            policy,
+            policy.isProjectionAllowed(field),
+            "Projection field is not allowed");
         if (metadata.plural() || isManagedType(metadata.javaType())) {
             throw rejected(
                 QueryErrorCode.UNSUPPORTED_PROJECTION,
@@ -88,7 +100,12 @@ final class JpaQueryPolicyValidator {
 
     private void validateSort(Class<?> entityType, String field, QueryPolicy policy) {
         var metadata = resolve(entityType, policy.resolveField(field));
-        validateCommon(field, metadata, policy);
+        validateCommon(
+            field,
+            metadata,
+            policy,
+            policy.isSortAllowed(field),
+            "Sort field is not allowed");
         if (metadata.plural()) {
             throw rejected(
                 QueryErrorCode.UNSUPPORTED_PROJECTION,
@@ -97,10 +114,31 @@ final class JpaQueryPolicyValidator {
         }
     }
 
-    private void validateCommon(String field, Metadata metadata, QueryPolicy policy) {
-        if (metadata.hidden() || !policy.isFieldAllowed(field)) {
-            throw rejected(QueryErrorCode.FIELD_NOT_ALLOWED, "Field is not queryable", field);
+    private void validateTieBreaker(Class<?> entityType, String field, QueryPolicy policy) {
+        var metadata = resolve(entityType, policy.resolveField(field));
+        validateTraversal(field, metadata, policy);
+        if (metadata.plural() || isManagedType(metadata.javaType())) {
+            throw rejected(
+                QueryErrorCode.UNSUPPORTED_PROJECTION,
+                "Tie-breaker must resolve to a scalar root or to-one field",
+                field);
         }
+    }
+
+    private void validateCommon(
+            String field,
+            Metadata metadata,
+            QueryPolicy policy,
+            boolean operationAllowed,
+            String rejectionMessage) {
+        if (metadata.hidden() || !operationAllowed) {
+            throw rejected(QueryErrorCode.FIELD_NOT_ALLOWED, rejectionMessage, field);
+        }
+        validateTraversal(field, metadata, policy);
+    }
+
+    private static void validateTraversal(
+            String field, Metadata metadata, QueryPolicy policy) {
         if (metadata.relationshipDepth() > 0 && !policy.relationshipTraversal()) {
             throw rejected(
                 QueryErrorCode.RELATIONSHIP_TRAVERSAL_DISABLED,
