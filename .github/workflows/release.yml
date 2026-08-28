@@ -40,7 +40,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ env.RELEASE_TAG }}
           path: candidate
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.candidate.outputs.commit }}
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.candidate.outputs.commit }}
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -92,7 +92,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.candidate.outputs.commit }}
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -106,7 +106,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.candidate.outputs.commit }}
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -126,7 +126,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.candidate.outputs.commit }}
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
